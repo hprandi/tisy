@@ -1,0 +1,39 @@
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Build / output
+dist/
+build/
+out/
+.next/
+.turbo/
+
+# Variáveis de ambiente (nunca versionar segredos/credenciais)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testes / cobertura
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
