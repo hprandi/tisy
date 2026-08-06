@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DocumentType {
+  CPF
+  PASSPORT
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  FINISHED
+}
+
+enum TicketTierStatus {
+  ACTIVE
+  SOLD_OUT
+  CLOSED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+enum TicketStatus {
+  ISSUED
+  CHECKED_IN
+  CANCELLED
+}
+
+model User {
+  id             String       @id @default(uuid())
+  name           String
+  email          String       @unique
+  documentType   DocumentType
+  documentNumber String
+  passwordHash   String?
+  createdAt      DateTime     @default(now())
+
+  organizedEvents Event[] @relation("EventOrganizer")
+  orders          Order[] @relation("OrderBuyer")
+
+  @@map("users")
+}
+
+model Event {
+  id          String      @id @default(uuid())
+  organizerId String
+  title       String
+  description String?
+  location    String
+  startDate   DateTime
+  endDate     DateTime
+  status      EventStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  organizer   User         @relation("EventOrganizer", fields: [organizerId], references: [id])
+  ticketTiers TicketTier[]
+  orders      Order[]
+
+  @@map("events")
+}
+
+model TicketTier {
+  id                String           @id @default(uuid())
+  eventId           String
+  name              String
+  currency          String
+  price             Decimal          @db.Decimal(10, 2)
+  quantityTotal     Int
+  quantityAvailable Int
+  salesStartAt      DateTime?
+  salesEndAt        DateTime?
+  status            TicketTierStatus @default(ACTIVE)
+
+  event      Event       @relation(fields: [eventId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("ticket_tiers")
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  eventId           String
+  buyerId           String
+  currency          String
+  totalAmount       Decimal     @db.Decimal(10, 2)
+  status            OrderStatus @default(PENDING)
+  paymentProvider   String?
+  paymentExternalId String?
+  expiresAt         DateTime
+  createdAt         DateTime    @default(now())
+  paidAt            DateTime?
+
+  event      Event       @relation(fields: [eventId], references: [id])
+  buyer      User        @relation("OrderBuyer", fields: [buyerId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(uuid())
+  orderId      String
+  ticketTierId String
+  currency     String
+  unitPrice    Decimal @db.Decimal(10, 2) // Snapshot of the ticket price in the purchase moment
+  quantity     Int
+
+  order      Order      @relation(fields: [orderId], references: [id])
+  ticketTier TicketTier @relation(fields: [ticketTierId], references: [id])
+  tickets    Ticket[]
+
+  @@map("order_items")
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  orderItemId String
+  code        String       @unique
+  status      TicketStatus @default(ISSUED)
+  checkedInAt DateTime?
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+
+  @@map("tickets")
+}
