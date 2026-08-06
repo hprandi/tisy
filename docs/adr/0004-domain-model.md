@@ -1,88 +1,88 @@
-# Modelo de domínio — MVP
+# Domain Model — MVP
 
-Este documento consolida o modelo de domínio definido para o MVP da plataforma de ingressos, discutido a partir das decisões registradas em `docs/adr/0001-decisoes-arquiteturais-iniciais.md` e `docs/pdr/0001-modelo-de-funcionamento-do-projeto.md`. Diferente de um ADR/PDR, este documento é vivo — deve ser atualizado conforme o modelo evolui, em vez de gerar um novo registro a cada ajuste pontual.
+This document consolidates the domain model defined for the MVP of the ticket platform, discussed based on decisions recorded in `docs/adr/0001-initial-architectural-decisions.md` and `docs/pdr/0001-project-operation-model.md`. Unlike an ADR/PDR, this document is living — it should be updated as the model evolves, rather than generating a new record with each minor adjustment.
 
-## Entidades
+## Entities
 
 ### User
 
-Identidade compartilhada entre organizadores e compradores — não existe um papel fixo (`role`) na conta; a condição de organizador é implícita por ter criado ao menos um `Event`.
+Shared identity between organizers and buyers — there is no fixed role (`role`) on the account; the status of organizer is implicit by having created at least one `Event`.
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| name | string | sim | |
-| email | string | sim | único; chave de correspondência para reconhecer comprador recorrente |
-| documentType | enum (CPF, PASSPORT, OTHER) | sim | `OTHER` cobre casos não previstos (ex: RNE de estrangeiro residente) |
-| documentNumber | string | sim | validação de formato/dígito verificador aplica-se apenas quando `documentType = CPF` |
-| passwordHash | string | não | nulo até a pessoa "reivindicar" a conta definindo uma senha; contas sem senha não podem autenticar via login |
-| createdAt | datetime | sim | |
+| id | uuid | yes | |
+| name | string | yes | |
+| email | string | yes | unique; lookup key to recognize recurring buyer |
+| documentType | enum (CPF, PASSPORT, OTHER) | yes | `OTHER` covers unforeseen cases (e.g., RNE of foreign resident) |
+| documentNumber | string | yes | format/check-digit validation applies only when `documentType = CPF` |
+| passwordHash | string | no | null until the person "claims" the account by setting a password; passwordless accounts cannot authenticate via login |
+| createdAt | datetime | yes | |
 
 ### Event
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| organizerId | uuid (→ User.id) | sim | |
-| title | string | sim | |
-| description | text | não | |
-| location | string | sim | |
-| startDate | datetime | sim | |
-| endDate | datetime | sim | |
-| status | enum (draft, published, cancelled, finished) | sim | |
-| createdAt / updatedAt | datetime | sim | |
+| id | uuid | yes | |
+| organizerId | uuid (→ User.id) | yes | |
+| title | string | yes | |
+| description | text | no | |
+| location | string | yes | |
+| startDate | datetime | yes | |
+| endDate | datetime | yes | |
+| status | enum (draft, published, cancelled, finished) | yes | |
+| createdAt / updatedAt | datetime | yes | |
 
 ### TicketTier
 
-Unidade vendável dentro de um evento — combina o que seria "categoria" (ex: VIP, Pista, Meia-entrada) e "lote" (janela de vendas com preço/quantidade próprios) numa única entidade, por decisão deliberada de simplicidade (ver seção "Decisões de nomenclatura" abaixo).
+Sellable unit within an event — combines what would be "category" (e.g., VIP, Floor, Half-price) and "batch" (sales window with its own price/quantity) into a single entity, by deliberate simplicity decision (see "Naming Decisions" section below).
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| eventId | uuid (→ Event.id) | sim | |
-| name | string | sim | ex: "1º lote", "VIP", "Meia-entrada" |
-| price | decimal | sim | preço de catálogo atual — pode mudar ao longo do tempo |
-| quantityTotal | int | sim | |
-| salesStartAt / salesEndAt | datetime | não | |
-| status | enum (active, sold_out, closed) | sim | |
+| id | uuid | yes | |
+| eventId | uuid (→ Event.id) | yes | |
+| name | string | yes | e.g.: "1st batch", "VIP", "Half-price" |
+| price | decimal | yes | current catalog price — may change over time |
+| quantityTotal | int | yes | |
+| salesStartAt / salesEndAt | datetime | no | |
+| status | enum (active, sold_out, closed) | yes | |
 
 ### Order
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| eventId | uuid (→ Event.id) | sim | |
-| buyerId | uuid (→ User.id) | sim | resolvido por email no checkout — cria `User` novo (sem senha) se não existir |
-| totalAmount | decimal | sim | |
-| status | enum (pending, paid, expired, cancelled, refunded) | sim | |
-| paymentProvider | string | não | preenchido após início do pagamento |
-| paymentExternalId | string | não | id do provedor (Pagar.me/Mercado Pago/Asaas, a definir) |
-| expiresAt | datetime | sim | define a janela de reserva antes da liberação automática do estoque |
-| createdAt / paidAt | datetime | sim / não | |
+| id | uuid | yes | |
+| eventId | uuid (→ Event.id) | yes | |
+| buyerId | uuid (→ User.id) | yes | resolved by email at checkout — creates new `User` (passwordless) if it doesn't exist |
+| totalAmount | decimal | yes | |
+| status | enum (pending, paid, expired, cancelled, refunded) | yes | |
+| paymentProvider | string | no | filled after payment starts |
+| paymentExternalId | string | no | provider id (Pagar.me/Mercado Pago/Asaas, to be decided) |
+| expiresAt | datetime | yes | defines the reservation window before automatic stock release |
+| createdAt / paidAt | datetime | yes / no | |
 
-Nota: dados do comprador (nome, email, documento) **não** são duplicados aqui — ficam apenas em `User`, referenciados via `buyerId`. Isso é uma escolha deliberadamente diferente da regra de preço (ver `OrderItem.unitPrice` abaixo): identidade do comprador reflete o estado atual do `User` (se ele corrigir um typo no nome, pedidos antigos "herdam" a correção), enquanto preço precisa ficar congelado no momento da compra por motivos financeiros/contábeis.
+Note: buyer data (name, email, document) is **not** duplicated here — it stays only in `User`, referenced via `buyerId`. This is a deliberately different choice from the price rule (see `OrderItem.unitPrice` below): buyer identity reflects the current state of `User` (if they correct a typo in the name, old orders "inherit" the correction), while price must be frozen at the moment of purchase for financial/accounting reasons.
 
 ### OrderItem
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| orderId | uuid (→ Order.id) | sim | |
-| ticketTierId | uuid (→ TicketTier.id) | sim | |
-| unitPrice | decimal | sim | **snapshot** do preço no momento da compra — não deriva do preço atual do `TicketTier`, que pode mudar depois |
-| quantity | int | sim | |
+| id | uuid | yes | |
+| orderId | uuid (→ Order.id) | yes | |
+| ticketTierId | uuid (→ TicketTier.id) | yes | |
+| unitPrice | decimal | yes | **snapshot** of the price at the moment of purchase — does not derive from the current price of `TicketTier`, which may change later |
+| quantity | int | yes | |
 
 ### Ticket
 
-| Campo | Tipo | Obrigatório | Observação |
+| Field | Type | Required | Note |
 |---|---|---|---|
-| id | uuid | sim | |
-| orderItemId | uuid (→ OrderItem.id) | sim | um `Ticket` por unidade comprada |
-| code | string | sim | token único e não-adivinhável (UUID ou assinado) — usado no QR code |
-| status | enum (issued, checked_in, cancelled) | sim | |
-| checkedInAt | datetime | não | |
+| id | uuid | yes | |
+| orderItemId | uuid (→ OrderItem.id) | yes | one `Ticket` per unit purchased |
+| code | string | yes | unique and non-guessable token (UUID or signed) — used in QR code |
+| status | enum (issued, checked_in, cancelled) | yes | |
+| checkedInAt | datetime | no | |
 
-## Relacionamentos
+## Relationships
 
 ```
 User 1──N Event (organizerId)
@@ -94,27 +94,27 @@ TicketTier 1──N OrderItem
 OrderItem 1──N Ticket
 ```
 
-## Invariantes e regras de negócio
+## Invariants and Business Rules
 
-**Reserva sem overselling** — ao criar um `Order`, a verificação e o decremento de quantidade disponível no `TicketTier` acontecem dentro de uma transação com `SELECT ... FOR UPDATE`, evitando corrida entre compradores simultâneos.
+**Reservation without overselling** — when creating an `Order`, checking and decrementing available quantity in `TicketTier` happens within a transaction with `SELECT ... FOR UPDATE`, avoiding a race between simultaneous buyers.
 
-**Expiração de reserva** — todo `Order` pendente tem `expiresAt`; a liberação do estoque reservado é verificada de forma preguiçosa (ao consultar disponibilidade, ignora pedidos pendentes já expirados), sem exigir job agendado no MVP.
+**Reservation expiration** — every pending `Order` has `expiresAt`; release of reserved stock is checked lazily (when querying availability, ignores already-expired pending orders), without requiring a scheduled job in the MVP.
 
-**Check-in atômico** — a leitura do QR code atualiza o `Ticket` com `UPDATE ... WHERE status = 'issued'`, evitando que duas leituras simultâneas validem o mesmo ingresso duas vezes.
+**Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE status = 'issued'`, preventing two simultaneous reads from validating the same ticket twice.
 
-**Preço congelado por pedido** — `OrderItem.unitPrice` é sempre uma cópia do preço no momento da compra, nunca uma referência ao preço atual do `TicketTier`.
+**Frozen price per order** — `OrderItem.unitPrice` is always a copy of the price at the moment of purchase, never a reference to the current price of `TicketTier`.
 
-**Documento flexível** — `documentType`/`documentNumber` aceitam CPF, passaporte ou outro; validação de formato só se aplica a CPF.
+**Flexible document** — `documentType`/`documentNumber` accept CPF, passport, or other; format validation applies only to CPF.
 
-**Contas sem senha não autenticam** — `User.passwordHash` nulo bloqueia login; a pessoa precisa passar por um fluxo de "reivindicar conta" (a definir) antes de conseguir logar.
+**Passwordless accounts do not authenticate** — null `User.passwordHash` blocks login; the person must go through a "claim account" flow (to be defined) before being able to log in.
 
-## Decisões de nomenclatura
+## Naming Decisions
 
-`TicketTier` foi escolhido para a entidade de unidade vendável, em vez de `TicketType` (impreciso — sugeria "tipo" quando o conceito é mais amplo). Alternativas consideradas: `TicketBatch` (foco em lote/inventário), `TicketClass` (termo usado pela API do Eventbrite), `TicketVariant` (vocabulário de e-commerce/catálogo), `PriceTier` (foco só em precificação), `AdmissionType` (foco no que a pessoa ganha ao comprar). Pode ser revisitado sem custo alto, já que é só nome de classe/tabela.
+`TicketTier` was chosen for the sellable unit entity, rather than `TicketType` (imprecise — suggested "type" when the concept is broader). Alternatives considered: `TicketBatch` (focus on batch/inventory), `TicketClass` (term used by Eventbrite API), `TicketVariant` (e-commerce/catalog vocabulary), `PriceTier` (pricing focus only), `AdmissionType` (focus on what the person gains by buying). Can be revisited without high cost, since it's just a class/table name.
 
-`User` foi escolhido no lugar de `Organizer` separado — motivo: a mesma pessoa pode organizar e comprar ao mesmo tempo, então um papel fixo (`role`) seria uma modelagem incorreta.
+`User` was chosen instead of separate `Organizer` — reason: the same person can organize and buy at the same time, so a fixed role (`role`) would be incorrect modeling.
 
-## Notas de implementação (não bloqueiam o modelo, mas vale lembrar depois)
+## Implementation Notes (Do Not Block the Model, But Worth Remembering Later)
 
-- Unicidade de `documentNumber` entre `User`s diferentes não está sendo garantida por enquanto (poderia permitir o mesmo documento cadastrado sob emails diferentes) — avaliar se vale a pena adicionar validação/alerta no futuro.
-- Um campo `eventId` denormalizado direto em `Ticket` pode valer a pena por performance de consulta no check-in (evita join até `Order`/`Event` a cada leitura de QR) — decidir na implementação, não é uma mudança estrutural do modelo.
+- Uniqueness of `documentNumber` across different `User`s is not currently guaranteed (could allow the same document registered under different emails) — evaluate if it's worth adding validation/alert in the future.
+- A denormalized `eventId` field directly on `Ticket` might be worthwhile for check-in query performance (avoids join to `Order`/`Event` with each QR read) — decide at implementation time, not a structural change to the model.
