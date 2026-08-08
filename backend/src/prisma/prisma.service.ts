@@ -1,14 +1,18 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '../../generated/prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-/**
- * PrismaService extends PrismaClient and manages its lifecycle.
- * Ensures the database connection is properly closed when the app shuts down.
- */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
+  constructor() {
+    const adapter = new PrismaPg({
+      connectionString: process.env.DATABASE_URL,
+    });
+
+    super({ adapter });
+  }
+
   async onModuleDestroy() {
     await this.$disconnect();
   }
 }
-
