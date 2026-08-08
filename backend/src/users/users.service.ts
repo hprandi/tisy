@@ -14,6 +14,19 @@ export class UsersService {
     });
   }
 
+  // TOOD: Should we never expose the full user outisde of this service?
+  async findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  // TOOD: Should we a have PublicUserInfo dto? Seems like this should also be typed
+  async findPublicById(id: string) {
+    const user = await this.findById(id);
+    return user ? this.publicUserInfo(user) : null;
+  }
+
   async create(createUserDto: CreateUserDto) {
       const { email, password, name, documentType, documentNumber } =
     createUserDto;
