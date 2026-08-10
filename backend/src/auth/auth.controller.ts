@@ -5,14 +5,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { CreateUserDto } from '../users/create-user.dto';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
-import { AuthenticatedUser } from './authenticated-user.interface';
+import type { AuthenticatedUser } from './authenticated-user.interface';
+import { CurrentUser } from './current-user.decorator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './login.dto';
 
@@ -37,8 +36,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async me(@Req() req: Request) {
-    const { userId } = req.user as AuthenticatedUser;
-    return this.usersService.findPublicUserById(userId);
+  async me(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.findPublicUserById(user.userId);
   }
 }
