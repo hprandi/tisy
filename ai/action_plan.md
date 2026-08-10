@@ -4,8 +4,8 @@ Roadmap only — no design decisions locked in here. Each step gets discussed in
 
 ## Next
 
-1. **Manage event** — `GET /events`, `GET /events/:id`, `PATCH /events/:id`. Introduces resource-ownership authorization (organizer-only).
-2. **Ticket tiers** — `POST/GET/PATCH /events/:id/ticket-tiers`.
+1. ~~**Manage event** — `GET /events`, `GET /events/:id`, `PATCH /events/:id`. Introduces resource-ownership authorization (organizer-only).~~ Done.
+2. ~~**Ticket tiers** — `POST/GET/PATCH /events/:id/ticket-tiers`.~~ Done.
 3. **Publish event** — `POST /events/:id/publish`, `DRAFT → PUBLISHED`.
 4. **Public read access** — unauthenticated visibility for published events/tiers.
 5. **Create order (reservation)** — `POST /events/:id/orders`, buyer identified by email, no login. First unauthenticated write endpoint.

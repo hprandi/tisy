@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { EventsModule } from './events/events.module';
+import { TicketTiersModule } from './ticket-tiers/ticket-tiers.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { EventsModule } from './events/events.module';
     }),
     AuthModule,
     EventsModule,
+    TicketTiersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
