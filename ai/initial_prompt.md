@@ -126,3 +126,7 @@ To keep the system lightweight and focused:
 - **Rationale for minor code refactors** — reserve ADRs for decisions that will impact the codebase for months or years.
 
 The discipline is: **Is this decision something future engineers need to understand to make good choices about the system?** If yes, document it. If it's an implementation detail or obvious choice, skip it.
+
+## Code Comments
+
+Code should be self-documenting: the "what" lives in clear method and variable names, not in comments. A comment is only added when it captures a "why" the code itself can't express — a deliberate trade-off, a non-obvious business rule, a workaround for a library quirk. Comments should never restate what the method already says.
