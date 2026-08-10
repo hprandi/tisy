@@ -14,6 +14,7 @@ import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { AuthenticatedUser } from './authenticated-user.interface';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { LoginDto } from './login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -26,6 +27,12 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() createUserDto: CreateUserDto) {
     return this.authService.register(createUserDto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto.email, loginDto.password);
   }
 
   @Get('me')
