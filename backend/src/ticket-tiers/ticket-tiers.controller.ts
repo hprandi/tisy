@@ -32,8 +32,8 @@ export class TicketTiersController {
     @Body() createTicketTierDto: CreateTicketTierDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.eventsService.findOwnedById(eventId, user.userId);
-    return this.ticketTiersService.create(eventId, createTicketTierDto);
+    const event = await this.eventsService.findOwnedById(eventId, user.userId);
+    return this.ticketTiersService.create(event, createTicketTierDto);
   }
 
   @Get()
@@ -52,8 +52,8 @@ export class TicketTiersController {
     @Body() updateTicketTierDto: UpdateTicketTierDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.eventsService.findOwnedById(eventId, user.userId);
+    const event = await this.eventsService.findOwnedById(eventId, user.userId);
     const tier = await this.ticketTiersService.findByIdInEvent(id, eventId);
-    return this.ticketTiersService.update(tier, updateTicketTierDto);
+    return this.ticketTiersService.update(tier, event, updateTicketTierDto);
   }
 }

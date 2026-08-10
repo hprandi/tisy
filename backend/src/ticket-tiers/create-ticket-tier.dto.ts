@@ -3,7 +3,6 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsPositive,
   IsString,
 } from 'class-validator';
@@ -21,11 +20,9 @@ export class CreateTicketTierDto {
   @IsPositive()
   quantityTotal!: number;
 
-  @IsOptional()
   @IsDateString()
-  salesStartAt?: string;
+  salesStartAt!: string;
 
-  @IsOptional()
   @IsDateString()
-  salesEndAt?: string;
+  salesEndAt!: string;
 }

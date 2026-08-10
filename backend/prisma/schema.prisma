@@ -84,8 +84,8 @@ model TicketTier {
   price             Decimal          @db.Decimal(10, 2)
   quantityTotal     Int
   quantityAvailable Int
-  salesStartAt      DateTime?
-  salesEndAt        DateTime?
+  salesStartAt      DateTime
+  salesEndAt        DateTime
   status            TicketTierStatus @default(ACTIVE)
 
   event      Event       @relation(fields: [eventId], references: [id])

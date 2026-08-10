@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { TicketTier } from '@prisma/client';
+import type { Event, TicketTier } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTicketTierDto } from './create-ticket-tier.dto';
 import { UpdateTicketTierDto } from './update-ticket-tier.dto';
@@ -9,21 +9,17 @@ export class TicketTiersService {
   constructor(private prisma: PrismaService) {}
 
   async create(
-    eventId: string,
+    event: Event,
     createTicketTierDto: CreateTicketTierDto,
   ): Promise<TicketTier> {
-    const salesStartAt = createTicketTierDto.salesStartAt
-      ? new Date(createTicketTierDto.salesStartAt)
-      : undefined;
-    const salesEndAt = createTicketTierDto.salesEndAt
-      ? new Date(createTicketTierDto.salesEndAt)
-      : undefined;
+    const salesStartAt = new Date(createTicketTierDto.salesStartAt);
+    const salesEndAt = new Date(createTicketTierDto.salesEndAt);
 
-    this.assertValidSalesWindow(salesStartAt, salesEndAt);
+    this.assertValidSalesWindow(salesStartAt, salesEndAt, event.endDate);
 
     return this.prisma.ticketTier.create({
       data: {
-        eventId,
+        eventId: event.id,
         name: createTicketTierDto.name,
         currency: 'BRL',
         price: createTicketTierDto.price,
@@ -51,6 +47,7 @@ export class TicketTiersService {
 
   async update(
     tier: TicketTier,
+    event: Event,
     updateTicketTierDto: UpdateTicketTierDto,
   ): Promise<TicketTier> {
     const salesStartAt = updateTicketTierDto.salesStartAt
@@ -60,7 +57,7 @@ export class TicketTiersService {
       ? new Date(updateTicketTierDto.salesEndAt)
       : tier.salesEndAt;
 
-    this.assertValidSalesWindow(salesStartAt, salesEndAt);
+    this.assertValidSalesWindow(salesStartAt, salesEndAt, event.endDate);
 
     return this.prisma.ticketTier.update({
       where: { id: tier.id },
@@ -68,20 +65,27 @@ export class TicketTiersService {
         ...updateTicketTierDto,
         salesStartAt,
         salesEndAt,
-        // Orders don't exist yet, so nothing has decremented quantityAvailable
-        // below quantityTotal — safe to mirror it here without a stock-aware merge.
-        quantityAvailable:
-          updateTicketTierDto.quantityTotal ?? tier.quantityAvailable,
       },
     });
   }
 
   private assertValidSalesWindow(
-    salesStartAt?: Date | null,
-    salesEndAt?: Date | null,
+    salesStartAt: Date,
+    salesEndAt: Date,
+    eventEndDate: Date,
   ): void {
-    if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
+    if (salesEndAt <= salesStartAt) {
       throw new BadRequestException('salesEndAt must be after salesStartAt.');
+    }
+    if (salesStartAt < new Date()) {
+      throw new BadRequestException(
+        'salesStartAt must be in the present or future.',
+      );
+    }
+    if (salesEndAt > eventEndDate) {
+      throw new BadRequestException(
+        'salesEndAt must not be after the event end date.',
+      );
     }
   }
 }

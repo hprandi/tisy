@@ -55,7 +55,7 @@ export class EventsService {
     const startDate = updateEventDto.startDate
       ? new Date(updateEventDto.startDate)
       : event.startDate;
-      
+
     const endDate = updateEventDto.endDate
       ? new Date(updateEventDto.endDate)
       : event.endDate;
