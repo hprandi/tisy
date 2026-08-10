@@ -6,8 +6,8 @@ Roadmap only — no design decisions locked in here. Each step gets discussed in
 
 1. ~~**Manage event** — `GET /events`, `GET /events/:id`, `PATCH /events/:id`. Introduces resource-ownership authorization (organizer-only).~~ Done.
 2. ~~**Ticket tiers** — `POST/GET/PATCH /events/:id/ticket-tiers`.~~ Done.
-3. **Publish event** — `POST /events/:id/publish`, `DRAFT → PUBLISHED`.
-4. **Public read access** — unauthenticated visibility for published events/tiers.
+3. ~~**Publish event** — `POST /events/:id/publish`, `DRAFT → PUBLISHED`.~~ Done.
+4. ~~**Public read access** — unauthenticated visibility for published events/tiers.~~ Done. Same endpoint (`GET /events/:id`) for owner and public, via `OptionalJwtAuthGuard` — not a separate `/public` route (see discussion).
 5. **Create order (reservation)** — `POST /events/:id/orders`, buyer identified by email, no login. First unauthenticated write endpoint.
 6. **Payment (Pix/card)** — pick a provider (open since ADR-0001/D5), start a charge.
 7. **Payment webhook + ticket issuance** — confirm payment, generate `Ticket` + QR code, email delivery.

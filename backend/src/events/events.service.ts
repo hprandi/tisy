@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventStatus, TicketTierStatus } from '@prisma/client';
 import type { Event } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './create-event.dto';
@@ -41,11 +43,28 @@ export class EventsService {
   async findOwnedById(id: string, organizerId: string): Promise<Event> {
     const event = await this.findById(id);
 
-    if (!event) {
+    if (!event || event.organizerId !== organizerId) {
       throw new NotFoundException('Event not found.');
     }
-    if (event.organizerId !== organizerId) {
-      throw new ForbiddenException('You do not own this event.');
+
+    return event;
+  }
+
+  async findByIdForViewer(id: string, viewerId?: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+      include: { ticketTiers: true },
+    });
+
+    if(!event){
+      throw new NotFoundException('Event not found.');
+    }
+
+    const isOwner = viewerId !== undefined && event?.organizerId === viewerId;
+    const isPublicViewable = event.status !== EventStatus.DRAFT
+
+    if (!isPublicViewable && !isOwner) {
+      throw new NotFoundException('Event not found.');
     }
 
     return event;
@@ -69,6 +88,27 @@ export class EventsService {
         startDate,
         endDate,
       },
+    });
+  }
+
+  async publish(event: Event): Promise<Event> {
+    if (event.status !== EventStatus.DRAFT) {
+      throw new ConflictException('Only draft events can be published.');
+    }
+
+    const activeTierCount = await this.prisma.ticketTier.count({
+      where: { eventId: event.id, status: TicketTierStatus.ACTIVE },
+    });
+
+    if (activeTierCount === 0) {
+      throw new BadRequestException(
+        'Event must have at least one active ticket tier to be published.',
+      );
+    }
+
+    return this.prisma.event.update({
+      where: { id: event.id },
+      data: { status: EventStatus.PUBLISHED },
     });
   }
 
