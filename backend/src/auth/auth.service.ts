@@ -12,13 +12,9 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
-    const isPasswordValid = await this.usersService.validatePassword(
-      user,
-      password,
-    );
+    const user = await this.usersService.getPublicUserIfValidCredentials(email, password);
 
-    if (!user || !isPasswordValid) {
+    if (!user) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 

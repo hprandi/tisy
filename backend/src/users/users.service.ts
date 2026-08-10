@@ -3,48 +3,28 @@ import * as bcrypt from 'bcrypt';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './create-user.dto';
+import { PublicUser } from './public-user.type';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
-    });
-  }
+  async create(createUserDto: CreateUserDto): Promise<PublicUser> {
+    const { email, password, name, documentType, documentNumber } =
+      createUserDto;
 
-  // TOOD: Should we never expose the full user outisde of this service?
-  async findById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { id },
-    });
-  }
-
-  // TOOD: Should we a have PublicUserInfo dto? Seems like this should also be typed
-  async findPublicById(id: string) {
-    const user = await this.findById(id);
-    return user ? this.publicUserInfo(user) : null;
-  }
-
-  async create(createUserDto: CreateUserDto) {
-      const { email, password, name, documentType, documentNumber } =
-    createUserDto;
-
-    const existingUser = await this.findByEmail(email);
+    const existingUser = await this.findUserByEmail(email);
 
     if (existingUser) {
       if (existingUser.passwordHash === null) {
-        // User entity exists, but without password. Allow user to claim the entity
+        // User entity exists without defined password. Allow user to claim the entity
         return this.claimAccount(email, password);
       } else {
-        throw new ConflictException(
-          'User already exists.',
-        );
+        throw new ConflictException('User already exists.');
       }
     }
 
-    const passwordHash = await bcrypt.hash(createUserDto.password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await this.prisma.user.create({
       data: {
@@ -56,20 +36,18 @@ export class UsersService {
       },
     });
 
-    return this.publicUserInfo(user);
+    return this.mapUserToPublicUser(user);
   }
 
-  async claimAccount(email: string, password: string) {
-    const user = await this.findByEmail(email);
+  async claimAccount(email: string, password: string): Promise<PublicUser> {
+    const user = await this.findUserByEmail(email);
 
     if (!user) {
       throw new ConflictException('User not found.');
     }
 
     if (user.passwordHash !== null) {
-      throw new ConflictException(
-        'User already has password. Cannot claim.',
-      );
+      throw new ConflictException('User already has password. Cannot claim.');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -79,19 +57,42 @@ export class UsersService {
       data: { passwordHash },
     });
 
-    return this.publicUserInfo(updatedUser);
+    return this.mapUserToPublicUser(updatedUser);
   }
 
-  async validatePassword(user: User | null, password: string): Promise<boolean> {
+  async getPublicUserIfValidCredentials(
+    email: string,
+    password: string,
+  ): Promise<PublicUser | null> {
+    const user = await this.findUserByEmail(email);
+
     if (!user || !user.passwordHash) {
-      return false;
+      return null;
     }
 
-    return bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    return isPasswordValid ? this.mapUserToPublicUser(user) : null;
   }
 
-  private publicUserInfo(user: any) {
-    const { passwordHash, ...result } = user;
-    return result;
+  async findPublicUserById(id: string): Promise<PublicUser | null> {
+    const user = await this.findUserById(id);
+    return user ? this.mapUserToPublicUser(user) : null;
+  }
+
+  private async findUserByEmail(email: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+    });
+  }
+
+  private async findUserById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  private mapUserToPublicUser(user: User): PublicUser {
+    const { passwordHash, ...rest } = user;
+    return rest;
   }
 }

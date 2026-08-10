@@ -32,6 +32,6 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async me(@Req() req: Request) {
     const { userId } = req.user as AuthenticatedUser;
-    return this.usersService.findPublicById(userId);
+    return this.usersService.findPublicUserById(userId);
   }
 }
