@@ -13,7 +13,7 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CreateOrderDto } from './create-order.dto';
 import { OrdersService } from './orders.service';
 
-@Controller('events/:eventId/orders')
+@Controller('orders')
 export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
@@ -21,10 +21,19 @@ export class OrdersController {
   @UseGuards(OptionalJwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Param('eventId') eventId: string,
     @Body() createOrderDto: CreateOrderDto,
     @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.ordersService.create(eventId, createOrderDto, user?.userId);
+    return this.ordersService.create(
+      createOrderDto.eventId,
+      createOrderDto,
+      user?.userId,
+    );
+  }
+
+  @Post(':id/payment')
+  @HttpCode(HttpStatus.OK)
+  async startPayment(@Param('id') id: string) {
+    return this.ordersService.startPayment(id);
   }
 }

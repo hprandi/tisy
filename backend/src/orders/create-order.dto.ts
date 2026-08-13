@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDefined,
   IsEnum,
+  IsUUID,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -16,6 +17,9 @@ export enum BuyerType {
 }
 
 export class CreateOrderDto {
+  @IsUUID()
+  eventId!: string;
+
   @IsEnum(BuyerType)
   buyerType!: BuyerType;
 
