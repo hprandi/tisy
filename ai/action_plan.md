@@ -9,7 +9,7 @@ Roadmap only — no design decisions locked in here. Each step gets discussed in
 3. ~~**Publish event** — `POST /events/:id/publish`, `DRAFT → PUBLISHED`.~~ Done.
 4. ~~**Public read access** — unauthenticated visibility for published events/tiers.~~ Done. Same endpoint (`GET /events/:id`) for owner and public, via `OptionalJwtAuthGuard` — not a separate `/public` route (see discussion).
 5. ~~**Create order (reservation)** — `POST /events/:id/orders`, buyer identified by email, no login. First unauthenticated write endpoint.~~ Done. Buyer identified via `buyerType: "me"` (JWT) or `"new"` (email lookup/create) — never a raw client-supplied user ID. Atomic conditional `UPDATE` prevents overselling.
-6. ~~**Payment (Pix/card)** — pick a provider (open since ADR-0001/D5), start a charge.~~ Done, verified end-to-end with real sandbox credentials. Mercado Pago, hosted checkout (Preferences API), `PaymentProvider` interface (port) + `MercadoPagoProvider` (adapter) so the domain isn't coupled to the SDK. `POST /orders/:id/payment` — public (Order ID as capability, no login), idempotent (`paymentCheckoutUrl` persisted, confirmed identical URL on repeat call). Provider errors wrapped as `BadGatewayException` with a safe message, real error logged server-side only.
+6. ~~**Payment (Pix/card)** — pick a provider (open since ADR-0001/D5), start a charge.~~ 
 7. **Payment webhook + ticket issuance** — confirm payment, generate `Ticket` + QR code, email delivery.
 8. **Check-in** — validate and consume a ticket by QR code.
 

@@ -1,17 +1,24 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
   EventStatus,
+  OrderStatus,
   Prisma,
   TicketTierStatus,
   type Event,
   type Order,
   type TicketTier,
 } from '@prisma/client';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+  type StartPaymentData,
+} from '../payments/payment-provider.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { BuyerType, CreateOrderDto } from './create-order.dto';
@@ -26,11 +33,16 @@ interface ReservedOrderItem {
   quantity: number;
 }
 
+type OrderWithItems = Prisma.OrderGetPayload<{
+  include: { orderItems: { include: { ticketTier: true } } };
+}>;
+
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
+    @Inject(PAYMENT_PROVIDER) private paymentProvider: PaymentProvider,
   ) {}
 
   async create(
@@ -60,6 +72,61 @@ export class OrdersService {
         include: { orderItems: true },
       });
     });
+  }
+
+  async startPayment(orderId: string): Promise<{ checkoutUrl: string }> {
+    const order = await this.findPendingOrder(orderId);
+
+    if (order.paymentCheckoutUrl) {
+      return { checkoutUrl: order.paymentCheckoutUrl };
+    }
+
+    const session = await this.paymentProvider.startPayment(
+      this.toStartPaymentData(order),
+    );
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentProvider: this.paymentProvider.providerName,
+        paymentExternalId: session.externalId,
+        paymentCheckoutUrl: session.checkoutUrl,
+      },
+    });
+
+    return { checkoutUrl: session.checkoutUrl };
+  }
+
+  private toStartPaymentData(order: OrderWithItems): StartPaymentData {
+    return {
+      orderId: order.id,
+      items: order.orderItems.map((item) => ({
+        ticketTierId: item.ticketTierId,
+        ticketTierName: item.ticketTier.name,
+        unitPrice: item.unitPrice.toString(),
+        currency: item.currency,
+        quantity: item.quantity,
+      })),
+    };
+  }
+
+  private async findPendingOrder(id: string): Promise<OrderWithItems> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { orderItems: { include: { ticketTier: true } } },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found.');
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new ConflictException('Order is not pending payment.');
+    }
+    if (order.expiresAt < new Date()) {
+      throw new ConflictException('Order has expired.');
+    }
+
+    return order;
   }
 
   private async resolveBuyerId(

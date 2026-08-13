@@ -17,6 +17,7 @@ export interface PaymentSession {
 }
 
 export interface PaymentProvider {
+  readonly providerName: string;
   startPayment(data: StartPaymentData): Promise<PaymentSession>;
 }
 

@@ -103,6 +103,7 @@ model Order {
   status            OrderStatus @default(PENDING)
   paymentProvider   String?
   paymentExternalId String?
+  paymentCheckoutUrl String?
   expiresAt         DateTime
   createdAt         DateTime    @default(now())
   paidAt            DateTime?

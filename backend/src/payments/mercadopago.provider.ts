@@ -9,6 +9,8 @@ import {
 
 @Injectable()
 export class MercadoPagoProvider implements PaymentProvider {
+  readonly providerName = 'mercadopago';
+
   private readonly logger = new Logger(MercadoPagoProvider.name);
   private client: MercadoPagoConfig;
 
