@@ -2,7 +2,7 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateUserDto } from './create-user.dto';
+import { CreateUserDto, DocumentType } from './create-user.dto';
 import { PublicUser } from './public-user.type';
 
 @Injectable()
@@ -77,6 +77,23 @@ export class UsersService {
   async findPublicUserById(id: string): Promise<PublicUser | null> {
     const user = await this.findUserById(id);
     return user ? this.mapUserToPublicUser(user) : null;
+  }
+
+  async findOrCreateBuyer(
+    name: string,
+    email: string,
+    documentType: DocumentType,
+    documentNumber: string,
+  ): Promise<User> {
+    const existingUser = await this.findUserByEmail(email);
+
+    if (existingUser) {
+      return existingUser;
+    }
+
+    return this.prisma.user.create({
+      data: { name, email, documentType, documentNumber },
+    });
   }
 
   private async findUserByEmail(email: string): Promise<User | null> {

@@ -43,7 +43,7 @@ Sellable unit within an event — combines what would be "category" (e.g., VIP, 
 | name | string | yes | e.g.: "1st batch", "VIP", "Half-price" |
 | price | decimal | yes | current catalog price — may change over time |
 | quantityTotal | int | yes | |
-| salesStartAt / salesEndAt | datetime | no | |
+| salesStartAt / salesEndAt | datetime | yes | `salesEndAt` must not be after the event's `endDate`; `salesStartAt` must be in the present or future at creation time |
 | status | enum (active, sold_out, closed) | yes | |
 
 ### Order
@@ -52,7 +52,7 @@ Sellable unit within an event — combines what would be "category" (e.g., VIP, 
 |---|---|---|---|
 | id | uuid | yes | |
 | eventId | uuid (→ Event.id) | yes | |
-| buyerId | uuid (→ User.id) | yes | resolved by email at checkout — creates new `User` (passwordless) if it doesn't exist |
+| buyerId | uuid (→ User.id) | yes | resolved via `buyerType` at checkout: `"me"` uses the identity from a valid JWT (never trusted from the request body); `"new"` looks up by email, creating a passwordless `User` if none exists |
 | totalAmount | decimal | yes | |
 | status | enum (pending, paid, expired, cancelled, refunded) | yes | |
 | paymentProvider | string | no | filled after payment starts |
@@ -96,9 +96,11 @@ OrderItem 1──N Ticket
 
 ## Invariants and Business Rules
 
-**Reservation without overselling** — when creating an `Order`, checking and decrementing available quantity in `TicketTier` happens within a transaction with `SELECT ... FOR UPDATE`, avoiding a race between simultaneous buyers.
+**Reservation without overselling** — when creating an `Order`, checking and decrementing available quantity in `TicketTier` happens via a single conditional `UPDATE` (`WHERE quantityAvailable >= qty`), relying on PostgreSQL's native row-level write atomicity — not `SELECT ... FOR UPDATE`, which Prisma's API doesn't support (see ADR-0003).
 
-**Reservation expiration** — every pending `Order` has `expiresAt`; release of reserved stock is checked lazily (when querying availability, ignores already-expired pending orders), without requiring a scheduled job in the MVP.
+**Buyer identity is never taken from the request body** — `buyerType: "me"` resolves the buyer from the authenticated request's JWT; a raw user ID supplied by the client is never trusted (would allow impersonating another account). `buyerType: "new"` requires full buyer info (`name`, `email`, `documentType`, `documentNumber`) to create or reuse a passwordless account.
+
+**Reservation expiration** — every pending `Order` has `expiresAt`, but automatic release of stock held by expired pending orders is not yet implemented (see backlog in `ai/action_plan.md`) — until then, abandoned checkouts permanently reduce `quantityAvailable`.
 
 **Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE status = 'issued'`, preventing two simultaneous reads from validating the same ticket twice.
 
