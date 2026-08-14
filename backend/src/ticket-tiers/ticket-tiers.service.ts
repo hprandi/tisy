@@ -79,11 +79,8 @@ export class TicketTiersService {
     });
   }
 
-  // Decrements quantityAvailable atomically (WHERE quantityAvailable >= quantity)
-  // so two concurrent reservations can never oversell the same tier. Takes the
-  // caller's own transaction client so this participates in whatever larger
-  // operation is reserving stock (e.g. order creation) — a failure elsewhere
-  // in that transaction rolls the reservation back too.
+  // WHERE quantityAvailable >= quantity makes the decrement atomic, so
+  // concurrent reservations can never oversell the same tier.
   async reserve(
     tx: Prisma.TransactionClient,
     eventId: string,
@@ -115,9 +112,6 @@ export class TicketTiersService {
     return tier;
   }
 
-  // The reverse of reserve() — gives quantity back (e.g. a payment failed
-  // after stock was already reserved). No purchasability check: releasing
-  // stock should always succeed regardless of the tier's current status.
   async release(
     tx: Prisma.TransactionClient,
     ticketTierId: string,
