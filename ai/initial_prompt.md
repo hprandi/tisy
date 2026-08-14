@@ -1,7 +1,3 @@
-# Ingressos Project — Initial Prompt
-
-Good evening Claude. I would like to start a conversation and evaluation about a new project.
-
 ## Project: Ticket Sales and Event Management Platform
 
 ### Overview
@@ -9,16 +5,6 @@ Good evening Claude. I would like to start a conversation and evaluation about a
 The idea is to develop a modern ticket sales and management platform for events. The initial objective is not to compete directly with major market players, but to build a simple product using the Pareto methodology—real, usable, and able to evolve gradually until it becomes a viable business.
 
 The project will be treated as a real product from day one, with a focus on good user experience, solid architecture, code quality, and continuous evolution.
-
-### Objectives
-
-The project has two main objectives:
-
-1. **Validate a business opportunity** by creating a platform that can be used in a real event (albeit small and for testing) and that can gradually evolve to serve larger events.
-
-2. **Serve as a professional development vehicle**, allowing the responsible engineer to expand their scope beyond Android development. The goal is to gain practical experience in full-stack development, systems architecture, infrastructure, back-end, web front-end, and eventually cross-platform mobile applications.
-
-This second motivation is important. The project should prioritize technologies and architectural decisions that generate relevant learning and strengthen the engineer's positioning in the international market.
 
 ### Project Philosophy
 
@@ -34,60 +20,38 @@ The system should be developed as if it were a commercial product from day one. 
 
 The goal is not merely to make the system work, but to build a technical foundation that demonstrates engineering maturity.
 
-### Technologies Considered
+## Engineering Working Agreement
 
-The idea discussed so far is to use a stack based on TypeScript, offering good synergy between front-end and back-end. The initial proposal would be something like:
+These are operating rules, not suggestions. They apply to any AI assistant (Claude, or otherwise) working in this codebase, on top of the philosophy above.
 
-- **Front-end Web**: React (possibly Next.js)
-- **Back-end**: Node.js + TypeScript
-- **Database**: PostgreSQL
-- **Mobile App (in a later stage)**: React Native or Kotlin Multiplatform (KMP)
+### 1. Confirm before implementing — no exceptions
 
-This choice was motivated both by technical potential and by value for the engineer's professional evolution. However, this decision is not yet final. Other alternatives were also considered, such as:
+Never write or edit a file until the plan has been explicitly approved in the conversation.
 
-- Flutter for mobile applications
-- Go for the back-end
-- Other combinations that make sense
+- For anything beyond a trivial one-liner (a typo, formatting, renaming a local variable), first state: what will change, which files are affected, and any trade-off or alternative worth flagging. Then **stop and wait** for an explicit go-ahead ("go", "ok", "pode implementar", etc.) before touching any file.
+- Proposing an approach and immediately implementing it in the same turn is not acceptable, even if the proposal sounds reasonable — the approval has to actually happen.
+- If, mid-implementation, the approach needs to change materially from what was approved, stop and re-confirm before continuing rather than improvising forward.
+- Read-only exploration (reading files, running tests, searching, checking git status) never needs confirmation — only writes do.
 
-We would like this conversation to critically reevaluate this stack decision, considering factors such as:
+### 2. Default engineering principles
 
-- Quality of development experience
-- Productivity
-- Ease of maintenance
-- Architectural quality
-- Learning potential
-- Relevance for the job market in coming years
-- Suitability for this product type
+Unless code already in the touched area establishes a different convention (match the existing convention instead), apply:
 
-If there are more interesting alternatives, we would like them presented along with their respective trade-offs.
+- **KISS / YAGNI first.** This is a small, Pareto-scoped product (see Overview) — prefer the simplest design that solves today's actual requirement. Do not add abstraction, config, or flexibility for hypothetical future needs; that's what an ADR is for once the need is real.
+- **SOLID, applied pragmatically.** Single-responsibility functions/classes, depend on abstractions at real seams (not everywhere), composition over inheritance. The goal is code that's easy to change, not a checklist to satisfy — don't introduce an interface, factory, or strategy pattern for something with one implementation and no evidence it'll need a second.
+- **DRY, but not premature.** Remove duplication once a pattern repeats with real, verified sameness. Two similar-looking blocks that may reasonably diverge later are not yet a duplication problem — don't force a shared abstraction just because two things currently look alike.
+- **Separation of concerns.** Keep domain/business logic out of controllers and framework glue. Keep infrastructure concerns (DB access, HTTP, third-party SDKs) behind a boundary the domain layer doesn't depend on directly.
+- **Think one layer up before writing code.** Before implementing, briefly consider where this belongs in the existing architecture (which layer, which module) rather than defaulting to the shortest edit in the file already open. If the natural placement differs from the obvious/easy placement, say so as part of the plan in rule #1.
+- If a request conflicts with these principles (e.g., "just inline it here" would tangle two concerns), say so and propose the alternative — don't silently comply and don't silently override the request either.
 
-### What We Expect from This Conversation
+### 3. Always present you work
+Whenever you have completed a user's command and generated code, you should explain to the user all the changes you did: showcase code, rational and explain decisions.
 
-We would like you to act in different roles throughout the project.
-
-**Role 1 — Project Coach/Manager**: Evaluate the idea, discuss strategy, and define initial steps.
-
-**Role 2 — Product Manager**: Briefly discuss product applicability in the market. We don't need to expand much on this point given that the project also aims at the user's professional evolution. But we also don't want to start without validating the product.
-
-**Role 3 — Experienced Software Architect and Technical Partner**: Support throughout the entire project.
-
-We expect to receive suggestions about:
-
-- System architecture
-- Domain modeling
-- MVP definition
-- Feature prioritization
-- Code organization
-- Engineering best practices
-- Technologies
-- Infrastructure
-- Security
-- Scalability
-- Product evolution strategy
-
-More than answering punctual questions, we seek support in making good technical and product decisions throughout development.
-
----
+### 4. Teach as you go
+The engineer operating this project is an Android engineer that woud like to expand its knowloge of other technologies.
+For this reason, whenever you write new code, you should share relevant information of what was written with the engineer. 
+If you apply a new pattern or language feature that you haven't seen in the code yet, teach the user.
+Always apply paretto - explain the 20% that represenhts 80% of the useful knowlodge.
 
 ## Documentation of Decisions
 
@@ -130,3 +94,7 @@ The discipline is: **Is this decision something future engineers need to underst
 ## Code Comments
 
 Code should be self-documenting: the "what" lives in clear method and variable names, not in comments. A comment is only added when it captures a "why" the code itself can't express — a deliberate trade-off, a non-obvious business rule, a workaround for a library quirk. Comments should never restate what the method already says.
+
+**Self-check before writing a comment**: would a competent engineer reading the code, types, and names already know this? If yes, delete the comment. Default to zero comments; add one only when that check fails.
+
+This also applies to doc comments (JSDoc/TSDoc): don't add one just to restate a parameter's type or an obvious return value. Reserve them for public API surfaces whose contract or behavior genuinely isn't obvious from the signature alone.

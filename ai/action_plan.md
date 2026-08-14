@@ -10,8 +10,11 @@ Roadmap only — no design decisions locked in here. Each step gets discussed in
 4. ~~**Public read access** — unauthenticated visibility for published events/tiers.~~ Done. Same endpoint (`GET /events/:id`) for owner and public, via `OptionalJwtAuthGuard` — not a separate `/public` route (see discussion).
 5. ~~**Create order (reservation)** — `POST /events/:id/orders`, buyer identified by email, no login. First unauthenticated write endpoint.~~ Done. Buyer identified via `buyerType: "me"` (JWT) or `"new"` (email lookup/create) — never a raw client-supplied user ID. Atomic conditional `UPDATE` prevents overselling.
 6. ~~**Payment (Pix/card)** — pick a provider (open since ADR-0001/D5), start a charge.~~ 
-7. **Payment webhook + ticket issuance** — confirm payment, generate `Ticket` + QR code, email delivery.
-8. **Check-in** — validate and consume a ticket by QR code.
+7. **Payment webhook — confirm payment** — `POST /payments/webhook/mercadopago`. Verify webhook signature, re-fetch canonical payment status from the Mercado Pago API (never trust the webhook payload directly — official MP guidance), then idempotently update `Order.status` (`PAID` on approved; cancel + release stock on rejected/cancelled).
+8. **Ticket issuance** — on payment confirmation, generate one `Ticket` per purchased unit (per `OrderItem.quantity`), each with a unique non-guessable `code`.
+9. **QR code generation** — render the QR from `Ticket.code` on demand (not stored).
+10. **Email delivery** — send tickets/QR to the buyer. Needs a provider decision first (PDR, same spirit as `docs/pdr/0002-mercado-pago-as-payment-provider.md`) — best-effort/non-blocking send, failure just logged (acceptable for a small test event).
+11. **Check-in** — validate and consume a ticket by QR code.
 
 ## Backlog
 
