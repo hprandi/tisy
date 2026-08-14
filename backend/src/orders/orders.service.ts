@@ -9,10 +9,8 @@ import {
   EventStatus,
   OrderStatus,
   Prisma,
-  TicketTierStatus,
   type Event,
   type Order,
-  type TicketTier,
 } from '@prisma/client';
 import {
   PAYMENT_PROVIDER,
@@ -20,6 +18,7 @@ import {
   type StartPaymentData,
 } from '../payments/payment-provider.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { TicketTiersService } from '../ticket-tiers/ticket-tiers.service';
 import { UsersService } from '../users/users.service';
 import { BuyerType, CreateOrderDto } from './create-order.dto';
 import { CreateOrderItemDto } from './create-order-item.dto';
@@ -42,6 +41,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
+    private ticketTiersService: TicketTiersService,
     @Inject(PAYMENT_PROVIDER) private paymentProvider: PaymentProvider,
   ) {}
 
@@ -186,19 +186,12 @@ export class OrdersService {
     eventId: string,
     item: CreateOrderItemDto,
   ): Promise<ReservedOrderItem> {
-    const tier = await this.findTierInEvent(tx, eventId, item.ticketTierId);
-    this.assertTierIsPurchasable(tier);
-
-    const decrement = await tx.ticketTier.updateMany({
-      where: { id: tier.id, quantityAvailable: { gte: item.quantity } },
-      data: { quantityAvailable: { decrement: item.quantity } },
-    });
-
-    if (decrement.count === 0) {
-      throw new ConflictException(
-        `Not enough tickets available for tier "${tier.name}".`,
-      );
-    }
+    const tier = await this.ticketTiersService.reserve(
+      tx,
+      eventId,
+      item.ticketTierId,
+      item.quantity,
+    );
 
     return {
       ticketTierId: tier.id,
@@ -206,39 +199,6 @@ export class OrdersService {
       unitPrice: tier.price,
       quantity: item.quantity,
     };
-  }
-
-  private async findTierInEvent(
-    tx: Prisma.TransactionClient,
-    eventId: string,
-    ticketTierId: string,
-  ): Promise<TicketTier> {
-    const tier = await tx.ticketTier.findUnique({
-      where: { id: ticketTierId },
-    });
-
-    if (!tier || tier.eventId !== eventId) {
-      throw new NotFoundException(
-        `Ticket tier ${ticketTierId} not found in this event.`,
-      );
-    }
-
-    return tier;
-  }
-
-  private assertTierIsPurchasable(tier: TicketTier): void {
-    const now = new Date();
-
-    if (tier.status !== TicketTierStatus.ACTIVE) {
-      throw new BadRequestException(
-        `Ticket tier "${tier.name}" is not available for purchase.`,
-      );
-    }
-    if (now < tier.salesStartAt || now > tier.salesEndAt) {
-      throw new BadRequestException(
-        `Ticket tier "${tier.name}" is outside its sales window.`,
-      );
-    }
   }
 
   private calculateTotal(items: ReservedOrderItem[]): Prisma.Decimal {
