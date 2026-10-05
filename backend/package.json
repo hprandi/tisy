@@ -17,6 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "db:migrate:test": "DOTENV_CONFIG_PATH=.env.test prisma migrate deploy",
+    "pretest:e2e": "npm run db:migrate:test",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
