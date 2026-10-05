@@ -6,5 +6,6 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFiles": ["<rootDir>/jest-integration.setup.ts"]
+  "setupFiles": ["<rootDir>/jest-integration.setup.ts"],
+  "maxWorkers": 1
 }
