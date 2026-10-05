@@ -6,7 +6,7 @@ import type {
   StartPaymentData,
 } from '../../src/payments/payment-provider.interface';
 
-// Stands in for MercadoPagoProvider in e2e tests — never calls the real API.
+// Stands in for MercadoPagoProvider in integration tests — never calls the real API.
 // Configure `nextStatus`/`nextOrderId` before posting to the webhook endpoint.
 export class FakePaymentProvider implements PaymentProvider {
   readonly providerName = 'fake';
