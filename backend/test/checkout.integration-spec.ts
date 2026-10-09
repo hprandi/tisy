@@ -1,6 +1,7 @@
 import { EventStatus, OrderStatus } from '@prisma/client';
 import type { PaymentConfirmationStatus } from '../src/payments/payment-provider.interface';
-import { aGuestBuyer, aTicketTier, anEvent } from './helpers/builders';
+import { aTicketTier, anEvent } from './helpers/builders';
+import { checkoutHelpers } from './helpers/checkout-helpers';
 import {
   HOUR_IN_MS,
   anOrganizer,
@@ -11,6 +12,7 @@ import { useTestApp } from './helpers/test-app';
 
 describe('Checkout (integration)', () => {
   const ctx = useTestApp();
+  const { placeOrder, findOrder, stockOf } = checkoutHelpers(ctx);
 
   // The happy path prepares the event through the organizer's real endpoints.
   async function createEventOnSaleThroughApi() {
@@ -35,30 +37,11 @@ describe('Checkout (integration)', () => {
     return { eventId, tierId };
   }
 
-  function placeOrder(eventId: string, tierId: string, quantity: number) {
-    return ctx.orders.createAsGuest({
-      eventId,
-      buyer: aGuestBuyer(),
-      items: [{ ticketTierId: tierId, quantity }],
-    });
-  }
-
   function reportPayment(orderId: string, status: PaymentConfirmationStatus) {
     ctx.paymentProvider.nextOrderId = orderId;
     ctx.paymentProvider.nextStatus = status;
 
     return ctx.webhook.notify();
-  }
-
-  function findOrder(orderId: string) {
-    return ctx.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-  }
-
-  async function stockOf(tierId: string): Promise<number> {
-    const tier = await ctx.prisma.ticketTier.findUniqueOrThrow({
-      where: { id: tierId },
-    });
-    return tier.quantityAvailable;
   }
 
   it('happy path: a guest buyer orders, pays and the order becomes PAID', async () => {
