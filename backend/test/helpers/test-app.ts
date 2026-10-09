@@ -5,7 +5,9 @@ import { AppModule } from '../../src/app.module';
 import { PAYMENT_PROVIDER } from '../../src/payments/payment-provider.interface';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { AuthApi } from './api/auth-api';
+import { EventsApi } from './api/events-api';
 import { OrdersApi } from './api/orders-api';
+import { TicketTiersApi } from './api/ticket-tiers-api';
 import { FakePaymentProvider } from './fake-payment-provider';
 import { resetDatabase } from './reset-database';
 
@@ -15,6 +17,8 @@ export interface TestContext {
   paymentProvider: FakePaymentProvider;
   auth: AuthApi;
   orders: OrdersApi;
+  events: EventsApi;
+  ticketTiers: TicketTiersApi;
 }
 
 // Call inside a describe: boots the app once for the file, resets the database
@@ -49,6 +53,8 @@ export function useTestApp(): TestContext {
       paymentProvider,
       auth: new AuthApi(app),
       orders: new OrdersApi(app),
+      events: new EventsApi(app),
+      ticketTiers: new TicketTiersApi(app),
     });
   });
 

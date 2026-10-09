@@ -1,5 +1,7 @@
 import { DocumentType, EventStatus } from '@prisma/client';
 import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { AuthApi } from './api/auth-api';
+import { aPerson } from './builders';
 
 export const HOUR_IN_MS = 60 * 60 * 1000;
 
@@ -59,4 +61,66 @@ export async function seedEventOnSale(
   });
 
   return { eventId: event.id, tierId: event.ticketTiers[0].id };
+}
+
+export interface Organizer {
+  id: string;
+  token: string;
+}
+
+// An account that can own events: registered through the API so it has a token.
+export async function anOrganizer(auth: AuthApi): Promise<Organizer> {
+  const registration = await auth.register(aPerson());
+  const token = registration.body.accessToken;
+  const me = await auth.me(token);
+
+  return { id: me.body.id, token };
+}
+
+export async function seedEvent(
+  prisma: PrismaService,
+  organizerId: string,
+  status: EventStatus = EventStatus.DRAFT,
+): Promise<string> {
+  const event = await prisma.event.create({
+    data: {
+      organizerId,
+      title: 'Seeded Event',
+      location: 'Test Venue',
+      startDate: new Date(Date.now() + 24 * HOUR_IN_MS),
+      endDate: new Date(Date.now() + 48 * HOUR_IN_MS),
+      status,
+    },
+  });
+
+  return event.id;
+}
+
+// A tier whose sales have not opened yet, like one just created through the API.
+export async function seedTicketTier(
+  prisma: PrismaService,
+  eventId: string,
+): Promise<string> {
+  const tier = await prisma.ticketTier.create({
+    data: {
+      eventId,
+      name: 'General',
+      currency: 'BRL',
+      price: 50,
+      quantityTotal: 10,
+      quantityAvailable: 10,
+      salesStartAt: new Date(Date.now() + HOUR_IN_MS),
+      salesEndAt: new Date(Date.now() + 24 * HOUR_IN_MS),
+    },
+  });
+
+  return tier.id;
+}
+
+export function countEvents(prisma: PrismaService): Promise<number> {
+  return prisma.event.count();
+}
+
+export function countTicketTiers(prisma: PrismaService): Promise<number> {
+  return prisma.ticketTier.count();
 }

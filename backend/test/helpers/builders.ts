@@ -42,3 +42,49 @@ export function aGuestBuyer(overrides: Partial<GuestBuyer> = {}): GuestBuyer {
     ...overrides,
   };
 }
+
+export interface NewEvent {
+  title: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface NewTicketTier {
+  name: string;
+  price: number;
+  quantityTotal: number;
+  salesStartAt: string;
+  salesEndAt: string;
+}
+
+export function hoursFromNow(hours: number): string {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
+export function anEvent(overrides: Partial<NewEvent> = {}): NewEvent {
+  sequence += 1;
+
+  return {
+    title: `Event ${sequence}`,
+    location: 'Test Venue',
+    startDate: hoursFromNow(24),
+    endDate: hoursFromNow(48),
+    ...overrides,
+  };
+}
+
+export function aTicketTier(
+  overrides: Partial<NewTicketTier> = {},
+): NewTicketTier {
+  sequence += 1;
+
+  return {
+    name: `Tier ${sequence}`,
+    price: 50,
+    quantityTotal: 10,
+    salesStartAt: hoursFromNow(1),
+    salesEndAt: hoursFromNow(24),
+    ...overrides,
+  };
+}

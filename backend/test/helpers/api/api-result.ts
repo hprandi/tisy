@@ -8,3 +8,7 @@ export interface ApiResult<T> {
 export function toApiResult<T>(response: Response): ApiResult<T> {
   return { status: response.status, body: response.body as T };
 }
+
+export function bearer(token?: string): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
