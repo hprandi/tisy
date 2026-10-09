@@ -196,7 +196,7 @@ describe('Checkout (integration)', () => {
   }
 
   // Given an event on sale with a tier of 10 tickets
-  // When a guest buyer orders 2, starts the payment and Mercado Pago reports it approved
+  // When a guest buyer orders 2, starts the payment and the payment provider reports it approved
   // Then the order ends PAID
   it('happy path: a guest buyer orders, pays and the order becomes PAID', async () => {
     const { eventId, tierId } = await createEventOnSaleThroughApi();
@@ -214,9 +214,9 @@ describe('Checkout (integration)', () => {
   it.todo('placing an order reserves the stock');
 
   // Given a pending order of 2 tickets whose payment was started
-  // When Mercado Pago reports the payment approved
+  // When the payment provider reports the payment approved
   // Then the order is PAID, paidAt is set, paymentExternalId is the payment id
-  //   (not the preference id) and the stock is still 8
+  //   (not the checkout session id) and the stock is still 8
   it('an approved payment marks the order PAID', async () => {
     const { eventId, tierId } = await seedEventOnSale();
     const order = await createPendingOrder(eventId, tierId, 2);
@@ -232,7 +232,7 @@ describe('Checkout (integration)', () => {
   });
 
   // Given a pending order of 2 tickets (stock 8)
-  // When Mercado Pago reports the payment cancelled
+  // When the payment provider reports the payment cancelled
   // Then the order is CANCELLED and the stock is back to 10
   it('a cancelled payment cancels the order and releases the stock', async () => {
     const { eventId, tierId } = await seedEventOnSale();
@@ -246,7 +246,7 @@ describe('Checkout (integration)', () => {
   });
 
   // Given a pending order
-  // When Mercado Pago first reports the payment pending, then approved
+  // When the payment provider first reports the payment pending, then approved
   // Then the order stays PENDING after the first notification and becomes PAID after the second
   it.todo('a pending payment waits and a later approval marks the order PAID');
 
@@ -271,8 +271,7 @@ describe('Checkout (integration)', () => {
   it.todo('starting the payment twice returns the same checkout');
 
   // Table: draft event (400) | tier outside its sales window (400) | quantity above the stock (409)
-  // Given an event and tiers matching each case
-  // When the buyer places each order
-  // Then each is rejected with the status above and no stock changes
+  // When the buyer orders in each case
+  // Then that status and no stock change
   it.todo('orders that are not allowed leave the stock untouched');
 });
