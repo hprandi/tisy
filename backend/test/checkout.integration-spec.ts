@@ -1,155 +1,61 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { OrderStatus } from '@prisma/client';
-import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
+import { EventStatus, OrderStatus } from '@prisma/client';
+import type { PaymentConfirmationStatus } from '../src/payments/payment-provider.interface';
+import { aGuestBuyer, aTicketTier, anEvent } from './helpers/builders';
 import {
-  PAYMENT_PROVIDER,
-  type PaymentConfirmationStatus,
-} from '../src/payments/payment-provider.interface';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { FakePaymentProvider } from './helpers/fake-payment-provider';
-import { HOUR_IN_MS, seedEventOnSale } from './helpers/fixtures';
-import { resetDatabase } from './helpers/reset-database';
+  HOUR_IN_MS,
+  anOrganizer,
+  seedEventOnSale,
+  type SaleOverrides,
+} from './helpers/fixtures';
+import { useTestApp } from './helpers/test-app';
 
 describe('Checkout (integration)', () => {
-  let app: INestApplication<App>;
-  let prisma: PrismaService;
-  let fakePaymentProvider: FakePaymentProvider;
+  const ctx = useTestApp();
 
-  beforeAll(async () => {
-    fakePaymentProvider = new FakePaymentProvider();
-
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(PAYMENT_PROVIDER)
-      .useValue(fakePaymentProvider)
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
+  // The happy path prepares the event through the organizer's real endpoints.
+  async function createEventOnSaleThroughApi() {
+    const organizer = await anOrganizer(ctx.auth);
+    const event = await ctx.events.create(organizer.token, anEvent());
+    const eventId = event.body.id;
+    const tier = await ctx.ticketTiers.create(
+      organizer.token,
+      eventId,
+      aTicketTier(),
     );
-    await app.init();
-
-    prisma = app.get(PrismaService);
-  });
-
-  beforeEach(async () => {
-    await resetDatabase(prisma);
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
-
-  // The happy path goes through the organizer's real endpoints instead.
-  async function createEventOnSaleThroughApi(): Promise<{
-    eventId: string;
-    tierId: string;
-  }> {
-    const register = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({
-        name: 'Test Organizer',
-        email: 'organizer@test.com',
-        password: 'Password123!',
-        documentType: 'CPF',
-        documentNumber: '12345678901',
-      })
-      .expect(201);
-    const token = (register.body as { accessToken: string }).accessToken;
-
-    const event = await request(app.getHttpServer())
-      .post('/events')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        title: 'Checkout Test Event',
-        location: 'Test Venue',
-        startDate: new Date(Date.now() + 24 * HOUR_IN_MS).toISOString(),
-        endDate: new Date(Date.now() + 48 * HOUR_IN_MS).toISOString(),
-      })
-      .expect(201);
-    const eventId = (event.body as { id: string }).id;
-
-    const tier = await request(app.getHttpServer())
-      .post(`/events/${eventId}/ticket-tiers`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'General',
-        price: 50,
-        quantityTotal: 10,
-        salesStartAt: new Date(Date.now() + 60 * 1000).toISOString(),
-        salesEndAt: new Date(Date.now() + 24 * HOUR_IN_MS).toISOString(),
-      })
-      .expect(201);
-    const tierId = (tier.body as { id: string }).id;
+    const tierId = tier.body.id;
 
     // The API only accepts a sales start in the future, yet buying needs the
     // window already open — the one unavoidable shortcut in this journey.
-    await prisma.ticketTier.update({
+    await ctx.prisma.ticketTier.update({
       where: { id: tierId },
-      data: { salesStartAt: new Date(Date.now() - 60 * 1000) },
+      data: { salesStartAt: new Date(Date.now() - HOUR_IN_MS) },
     });
-
-    await request(app.getHttpServer())
-      .post(`/events/${eventId}/publish`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
+    await ctx.events.publish(organizer.token, eventId);
 
     return { eventId, tierId };
   }
 
-  async function createPendingOrder(
-    eventId: string,
-    tierId: string,
-    quantity: number,
-  ): Promise<{ id: string }> {
-    const order = await request(app.getHttpServer())
-      .post('/orders')
-      .send({
-        eventId,
-        buyerType: 'new',
-        buyerInfo: {
-          name: 'Test Buyer',
-          email: 'buyer@test.com',
-          documentType: 'CPF',
-          documentNumber: '98765432100',
-        },
-        items: [{ ticketTierId: tierId, quantity }],
-      })
-      .expect(201);
-
-    return { id: (order.body as { id: string }).id };
-  }
-
-  async function startPayment(orderId: string): Promise<void> {
-    await request(app.getHttpServer())
-      .post(`/orders/${orderId}/payment`)
-      .expect(200);
+  function placeOrder(eventId: string, tierId: string, quantity: number) {
+    return ctx.orders.createAsGuest({
+      eventId,
+      buyer: aGuestBuyer(),
+      items: [{ ticketTierId: tierId, quantity }],
+    });
   }
 
   function reportPayment(orderId: string, status: PaymentConfirmationStatus) {
-    fakePaymentProvider.nextOrderId = orderId;
-    fakePaymentProvider.nextStatus = status;
+    ctx.paymentProvider.nextOrderId = orderId;
+    ctx.paymentProvider.nextStatus = status;
 
-    return request(app.getHttpServer())
-      .post('/payments/webhook/mercadopago?data.id=fake-payment-id')
-      .send({ type: 'payment', data: { id: 'fake-payment-id' } });
+    return ctx.webhook.notify();
   }
 
   function findOrder(orderId: string) {
-    return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    return ctx.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   }
 
   async function stockOf(tierId: string): Promise<number> {
-    const tier = await prisma.ticketTier.findUniqueOrThrow({
+    const tier = await ctx.prisma.ticketTier.findUniqueOrThrow({
       where: { id: tierId },
     });
     return tier.quantityAvailable;
@@ -160,31 +66,48 @@ describe('Checkout (integration)', () => {
     const { eventId, tierId } = await createEventOnSaleThroughApi();
 
     // When a guest buyer orders 2, starts the payment and the provider reports it approved
-    const order = await createPendingOrder(eventId, tierId, 2);
-    await startPayment(order.id);
-    await reportPayment(order.id, 'approved').expect(200);
+    const order = await placeOrder(eventId, tierId, 2);
+    const payment = await ctx.orders.startPayment(order.body.id);
+    const notification = await reportPayment(order.body.id, 'approved');
 
     // Then the order ends PAID
-    expect((await findOrder(order.id)).status).toBe(OrderStatus.PAID);
+    expect(order.status).toBe(201);
+    expect(payment.status).toBe(200);
+    expect(notification.status).toBe(200);
+    expect((await findOrder(order.body.id)).status).toBe(OrderStatus.PAID);
   });
 
-  // Given an event on sale with a tier of 10 tickets
-  // When a guest buyer orders 2
-  // Then the order is PENDING with total = 2 x price and an expiry set, and the tier stock is 8
-  it.todo('placing an order reserves the stock');
+  it('placing an order reserves the stock', async () => {
+    // Given an event on sale with a tier of 10 tickets
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+
+    // When a guest buyer orders 2
+    const order = await placeOrder(eventId, tierId, 2);
+
+    // Then the order is PENDING with total = 2 x price and an expiry set, and the tier stock is 8
+    expect(order.status).toBe(201);
+    expect(order.body).toMatchObject({
+      status: OrderStatus.PENDING,
+      totalAmount: '100',
+    });
+    expect(new Date(order.body.expiresAt).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
+    expect(await stockOf(tierId)).toBe(8);
+  });
 
   it('an approved payment marks the order PAID', async () => {
     // Given a pending order of 2 tickets whose payment was started
-    const { eventId, tierId } = await seedEventOnSale(prisma);
-    const order = await createPendingOrder(eventId, tierId, 2);
-    await startPayment(order.id);
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
+    await ctx.orders.startPayment(order.body.id);
 
     // When the payment provider reports the payment approved
-    await reportPayment(order.id, 'approved').expect(200);
+    await reportPayment(order.body.id, 'approved');
 
     // Then the order is PAID, paidAt is set, paymentExternalId is the payment id
     //   (not the checkout session id) and the stock is still 8
-    const paid = await findOrder(order.id);
+    const paid = await findOrder(order.body.id);
     expect(paid.status).toBe(OrderStatus.PAID);
     expect(paid.paidAt).not.toBeNull();
     expect(paid.paymentExternalId).toBe('fake-payment-id');
@@ -193,45 +116,125 @@ describe('Checkout (integration)', () => {
 
   it('a cancelled payment cancels the order and releases the stock', async () => {
     // Given a pending order of 2 tickets (stock 8)
-    const { eventId, tierId } = await seedEventOnSale(prisma);
-    const order = await createPendingOrder(eventId, tierId, 2);
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
     expect(await stockOf(tierId)).toBe(8);
 
     // When the payment provider reports the payment cancelled
-    await reportPayment(order.id, 'cancelled').expect(200);
+    await reportPayment(order.body.id, 'cancelled');
 
     // Then the order is CANCELLED and the stock is back to 10
-    expect((await findOrder(order.id)).status).toBe(OrderStatus.CANCELLED);
+    expect((await findOrder(order.body.id)).status).toBe(OrderStatus.CANCELLED);
     expect(await stockOf(tierId)).toBe(10);
   });
 
-  // Given a pending order
-  // When the payment provider first reports the payment pending, then approved
-  // Then the order stays PENDING after the first notification and becomes PAID after the second
-  it.todo('a pending payment waits and a later approval marks the order PAID');
+  it('a pending payment waits and a later approval marks the order PAID', async () => {
+    // Given a pending order
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
 
-  // Given a pending order of 2 tickets (stock 8)
-  // When the same cancelled notification arrives twice
-  // Then the stock is 10, not 12
-  it.todo('a cancelled notification repeated twice releases the stock once');
+    // When the payment provider first reports the payment pending, then approved
+    await reportPayment(order.body.id, 'pending');
+    const afterPending = await findOrder(order.body.id);
+    await reportPayment(order.body.id, 'approved');
+    const afterApproved = await findOrder(order.body.id);
 
-  // Given a pending order
-  // When the same approved notification arrives twice
-  // Then the order is PAID and paidAt does not change on the second one
-  it.todo('an approved notification repeated twice does not change paidAt');
+    // Then the order stays PENDING after the first notification and becomes PAID after the second
+    expect(afterPending.status).toBe(OrderStatus.PENDING);
+    expect(afterApproved.status).toBe(OrderStatus.PAID);
+  });
 
-  // Given a tier with 1 ticket left
-  // When two buyers order it at the same time
-  // Then exactly one gets 201 and the other 409, the stock is 0 and only one order exists
-  it.todo('two buyers racing for the last ticket cannot oversell it');
+  it('a cancelled notification repeated twice releases the stock once', async () => {
+    // Given a pending order of 2 tickets (stock 8)
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
 
-  // Given an order whose payment was already started
-  // When the buyer starts the payment again
-  // Then the same checkoutUrl is returned and the provider is called only once
-  it.todo('starting the payment twice returns the same checkout');
+    // When the same cancelled notification arrives twice
+    await reportPayment(order.body.id, 'cancelled');
+    await reportPayment(order.body.id, 'cancelled');
 
-  // Table: draft event (400) | tier outside its sales window (400) | quantity above the stock (409)
-  // When the buyer orders in each case
-  // Then that status and no stock change
-  it.todo('orders that are not allowed leave the stock untouched');
+    // Then the stock is 10, not 12
+    expect(await stockOf(tierId)).toBe(10);
+  });
+
+  it('an approved notification repeated twice does not change paidAt', async () => {
+    // Given a pending order
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
+
+    // When the same approved notification arrives twice
+    await reportPayment(order.body.id, 'approved');
+    const firstPaidAt = (await findOrder(order.body.id)).paidAt;
+    await reportPayment(order.body.id, 'approved');
+
+    // Then the order is PAID and paidAt does not change on the second one
+    const afterSecond = await findOrder(order.body.id);
+    expect(afterSecond.status).toBe(OrderStatus.PAID);
+    expect(afterSecond.paidAt).toEqual(firstPaidAt);
+  });
+
+  it('two buyers racing for the last ticket cannot oversell it', async () => {
+    // Given a tier with 1 ticket left
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma, {
+      tickets: 1,
+    });
+
+    // When two buyers order it at the same time
+    const results = await Promise.all([
+      placeOrder(eventId, tierId, 1),
+      placeOrder(eventId, tierId, 1),
+    ]);
+
+    // Then exactly one gets 201 and the other 409, the stock is 0 and only one order exists
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+    expect(await stockOf(tierId)).toBe(0);
+    expect(await ctx.prisma.order.count()).toBe(1);
+  });
+
+  it('starting the payment twice returns the same checkout', async () => {
+    // Given an order whose payment was already started
+    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
+    const order = await placeOrder(eventId, tierId, 2);
+    const first = await ctx.orders.startPayment(order.body.id);
+
+    // When the buyer starts the payment again
+    const second = await ctx.orders.startPayment(order.body.id);
+
+    // Then the same checkoutUrl is returned and the provider is called only once
+    expect(second.body.checkoutUrl).toBe(first.body.checkoutUrl);
+    expect(ctx.paymentProvider.startPaymentCalls).toBe(1);
+  });
+
+  describe('orders that are not allowed', () => {
+    // Table: draft event (400) | tier outside its sales window (400) | quantity above the stock (409)
+    it.each<[string, SaleOverrides, number, number]>([
+      [
+        'an event that is still a draft',
+        { eventStatus: EventStatus.DRAFT },
+        1,
+        400,
+      ],
+      [
+        'a tier whose sales have not started',
+        { salesStartAt: new Date(Date.now() + HOUR_IN_MS) },
+        1,
+        400,
+      ],
+      ['more tickets than the stock', { tickets: 2 }, 3, 409],
+    ])(
+      '%s is rejected and leaves the stock untouched',
+      async (_case, sale, quantity, expectedStatus) => {
+        // Given an event and a tier matching the case
+        const { eventId, tierId } = await seedEventOnSale(ctx.prisma, sale);
+        const stockBefore = await stockOf(tierId);
+
+        // When the buyer orders
+        const result = await placeOrder(eventId, tierId, quantity);
+
+        // Then that status and no stock change
+        expect(result.status).toBe(expectedStatus);
+        expect(await stockOf(tierId)).toBe(stockBefore);
+      },
+    );
+  });
 });

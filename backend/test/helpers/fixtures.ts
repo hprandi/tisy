@@ -25,10 +25,19 @@ export function countAccounts(prisma: PrismaService): Promise<number> {
   return prisma.user.count();
 }
 
-// A published event with one open tier of 10 tickets, built straight in the
-// database so tests do not depend on the organizer's endpoints.
+// An event on sale with one open tier of 10 tickets, built straight in the
+// database so tests do not depend on the organizer's endpoints. The overrides
+// describe how it differs from that default.
+export interface SaleOverrides {
+  tickets?: number;
+  eventStatus?: EventStatus;
+  salesStartAt?: Date;
+  salesEndAt?: Date;
+}
+
 export async function seedEventOnSale(
   prisma: PrismaService,
+  overrides: SaleOverrides = {},
 ): Promise<{ eventId: string; tierId: string }> {
   const event = await prisma.event.create({
     data: {
@@ -36,7 +45,7 @@ export async function seedEventOnSale(
       location: 'Test Venue',
       startDate: new Date(Date.now() + 24 * HOUR_IN_MS),
       endDate: new Date(Date.now() + 48 * HOUR_IN_MS),
-      status: EventStatus.PUBLISHED,
+      status: overrides.eventStatus ?? EventStatus.PUBLISHED,
       organizer: {
         create: {
           name: 'Seeded Organizer',
@@ -50,10 +59,12 @@ export async function seedEventOnSale(
           name: 'General',
           currency: 'BRL',
           price: 50,
-          quantityTotal: 10,
-          quantityAvailable: 10,
-          salesStartAt: new Date(Date.now() - HOUR_IN_MS),
-          salesEndAt: new Date(Date.now() + 24 * HOUR_IN_MS),
+          quantityTotal: overrides.tickets ?? 10,
+          quantityAvailable: overrides.tickets ?? 10,
+          salesStartAt:
+            overrides.salesStartAt ?? new Date(Date.now() - HOUR_IN_MS),
+          salesEndAt:
+            overrides.salesEndAt ?? new Date(Date.now() + 24 * HOUR_IN_MS),
         },
       },
     },

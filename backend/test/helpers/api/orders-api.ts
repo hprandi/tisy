@@ -13,6 +13,12 @@ export interface CreatedOrder {
   id: string;
   buyerId: string;
   status: string;
+  totalAmount: string;
+  expiresAt: string;
+}
+
+export interface PaymentStart {
+  checkoutUrl: string;
 }
 
 export class OrdersApi {
@@ -36,6 +42,14 @@ export class OrdersApi {
         },
         items: order.items,
       });
+
+    return toApiResult(response);
+  }
+
+  async startPayment(orderId: string): Promise<ApiResult<PaymentStart>> {
+    const response = await request(this.app.getHttpServer()).post(
+      `/orders/${orderId}/payment`,
+    );
 
     return toApiResult(response);
   }

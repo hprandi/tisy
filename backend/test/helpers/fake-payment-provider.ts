@@ -6,6 +6,8 @@ import type {
   StartPaymentData,
 } from '../../src/payments/payment-provider.interface';
 
+export const FAKE_PAYMENT_ID = 'fake-payment-id';
+
 // Stands in for MercadoPagoProvider in integration tests — never calls the real API.
 // Configure `nextStatus`/`nextOrderId` before posting to the webhook endpoint.
 export class FakePaymentProvider implements PaymentProvider {
@@ -13,8 +15,16 @@ export class FakePaymentProvider implements PaymentProvider {
 
   nextStatus: PaymentConfirmationStatus = 'approved';
   nextOrderId = '';
+  startPaymentCalls = 0;
+
+  reset(): void {
+    this.nextStatus = 'approved';
+    this.nextOrderId = '';
+    this.startPaymentCalls = 0;
+  }
 
   startPayment(data: StartPaymentData): Promise<PaymentSession> {
+    this.startPaymentCalls += 1;
     return Promise.resolve({
       externalId: 'fake-preference-id',
       checkoutUrl: `https://fake.checkout/${data.orderId}`,
@@ -26,7 +36,7 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   extractPaymentId(): string | null {
-    return 'fake-payment-id';
+    return FAKE_PAYMENT_ID;
   }
 
   getPaymentStatus(): Promise<PaymentStatusResult> {
