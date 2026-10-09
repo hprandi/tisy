@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DocumentType, EventStatus, OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
@@ -10,9 +10,8 @@ import {
 } from '../src/payments/payment-provider.interface';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FakePaymentProvider } from './helpers/fake-payment-provider';
+import { HOUR_IN_MS, seedEventOnSale } from './helpers/fixtures';
 import { resetDatabase } from './helpers/reset-database';
-
-const HOUR_IN_MS = 60 * 60 * 1000;
 
 describe('Checkout (integration)', () => {
   let app: INestApplication<App>;
@@ -49,45 +48,6 @@ describe('Checkout (integration)', () => {
   afterAll(async () => {
     await app.close();
   });
-
-  // Every checkout starts from an event on sale. The focused tests build it
-  // straight in the database so they do not depend on the organizer's endpoints.
-  async function seedEventOnSale(): Promise<{
-    eventId: string;
-    tierId: string;
-  }> {
-    const event = await prisma.event.create({
-      data: {
-        title: 'Seeded Event',
-        location: 'Test Venue',
-        startDate: new Date(Date.now() + 24 * HOUR_IN_MS),
-        endDate: new Date(Date.now() + 48 * HOUR_IN_MS),
-        status: EventStatus.PUBLISHED,
-        organizer: {
-          create: {
-            name: 'Seeded Organizer',
-            email: 'organizer@test.com',
-            documentType: DocumentType.CPF,
-            documentNumber: '12345678901',
-          },
-        },
-        ticketTiers: {
-          create: {
-            name: 'General',
-            currency: 'BRL',
-            price: 50,
-            quantityTotal: 10,
-            quantityAvailable: 10,
-            salesStartAt: new Date(Date.now() - HOUR_IN_MS),
-            salesEndAt: new Date(Date.now() + 24 * HOUR_IN_MS),
-          },
-        },
-      },
-      include: { ticketTiers: true },
-    });
-
-    return { eventId: event.id, tierId: event.ticketTiers[0].id };
-  }
 
   // The happy path goes through the organizer's real endpoints instead.
   async function createEventOnSaleThroughApi(): Promise<{
@@ -195,16 +155,16 @@ describe('Checkout (integration)', () => {
     return tier.quantityAvailable;
   }
 
-  // Given an event on sale with a tier of 10 tickets
-  // When a guest buyer orders 2, starts the payment and the payment provider reports it approved
-  // Then the order ends PAID
   it('happy path: a guest buyer orders, pays and the order becomes PAID', async () => {
+    // Given an event on sale with a tier of 10 tickets
     const { eventId, tierId } = await createEventOnSaleThroughApi();
 
+    // When a guest buyer orders 2, starts the payment and the provider reports it approved
     const order = await createPendingOrder(eventId, tierId, 2);
     await startPayment(order.id);
     await reportPayment(order.id, 'approved').expect(200);
 
+    // Then the order ends PAID
     expect((await findOrder(order.id)).status).toBe(OrderStatus.PAID);
   });
 
@@ -213,17 +173,17 @@ describe('Checkout (integration)', () => {
   // Then the order is PENDING with total = 2 x price and an expiry set, and the tier stock is 8
   it.todo('placing an order reserves the stock');
 
-  // Given a pending order of 2 tickets whose payment was started
-  // When the payment provider reports the payment approved
-  // Then the order is PAID, paidAt is set, paymentExternalId is the payment id
-  //   (not the checkout session id) and the stock is still 8
   it('an approved payment marks the order PAID', async () => {
-    const { eventId, tierId } = await seedEventOnSale();
+    // Given a pending order of 2 tickets whose payment was started
+    const { eventId, tierId } = await seedEventOnSale(prisma);
     const order = await createPendingOrder(eventId, tierId, 2);
     await startPayment(order.id);
 
+    // When the payment provider reports the payment approved
     await reportPayment(order.id, 'approved').expect(200);
 
+    // Then the order is PAID, paidAt is set, paymentExternalId is the payment id
+    //   (not the checkout session id) and the stock is still 8
     const paid = await findOrder(order.id);
     expect(paid.status).toBe(OrderStatus.PAID);
     expect(paid.paidAt).not.toBeNull();
@@ -231,16 +191,16 @@ describe('Checkout (integration)', () => {
     expect(await stockOf(tierId)).toBe(8);
   });
 
-  // Given a pending order of 2 tickets (stock 8)
-  // When the payment provider reports the payment cancelled
-  // Then the order is CANCELLED and the stock is back to 10
   it('a cancelled payment cancels the order and releases the stock', async () => {
-    const { eventId, tierId } = await seedEventOnSale();
+    // Given a pending order of 2 tickets (stock 8)
+    const { eventId, tierId } = await seedEventOnSale(prisma);
     const order = await createPendingOrder(eventId, tierId, 2);
     expect(await stockOf(tierId)).toBe(8);
 
+    // When the payment provider reports the payment cancelled
     await reportPayment(order.id, 'cancelled').expect(200);
 
+    // Then the order is CANCELLED and the stock is back to 10
     expect((await findOrder(order.id)).status).toBe(OrderStatus.CANCELLED);
     expect(await stockOf(tierId)).toBe(10);
   });
