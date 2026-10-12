@@ -38,6 +38,7 @@ enum OrderStatus {
 
 enum TicketStatus {
   ISSUED
+  READY
   CHECKED_IN
   CANCELLED
 }
@@ -134,6 +135,8 @@ model Ticket {
   id          String       @id @default(uuid())
   orderItemId String
   code        String       @unique
+  holderName  String?
+  holderEmail String?
   status      TicketStatus @default(ISSUED)
   checkedInAt DateTime?
 
