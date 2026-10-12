@@ -17,6 +17,27 @@ export interface CreatedOrder {
   expiresAt: string;
 }
 
+export interface OrderView {
+  id: string;
+  status: string;
+  event: {
+    id: string;
+    title: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+  };
+  buyerName: string;
+}
+
+export interface TicketView {
+  id: string;
+  code: string;
+  tierName: string;
+  holderName: string | null;
+  status: string;
+}
+
 export interface PaymentStart {
   checkoutUrl: string;
 }
@@ -50,6 +71,34 @@ export class OrdersApi {
     const response = await request(this.app.getHttpServer()).post(
       `/orders/${orderId}/payment`,
     );
+
+    return toApiResult(response);
+  }
+
+  async get(orderId: string): Promise<ApiResult<OrderView>> {
+    const response = await request(this.app.getHttpServer()).get(
+      `/orders/${orderId}`,
+    );
+
+    return toApiResult(response);
+  }
+
+  async tickets(orderId: string): Promise<ApiResult<TicketView[]>> {
+    const response = await request(this.app.getHttpServer()).get(
+      `/orders/${orderId}/tickets`,
+    );
+
+    return toApiResult(response);
+  }
+
+  async nameTicket(
+    orderId: string,
+    ticketId: string,
+    holder: { holderName?: string; holderEmail?: string },
+  ): Promise<ApiResult<TicketView>> {
+    const response = await request(this.app.getHttpServer())
+      .patch(`/orders/${orderId}/tickets/${ticketId}`)
+      .send(holder);
 
     return toApiResult(response);
   }

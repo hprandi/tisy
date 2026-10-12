@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -12,10 +14,15 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CreateOrderDto } from './create-order.dto';
 import { OrdersService } from './orders.service';
+import { NameTicketDto } from '../tickets/name-ticket.dto';
+import { TicketsService } from '../tickets/tickets.service';
 
 @Controller('orders')
 export class OrdersController {
-  constructor(private ordersService: OrdersService) {}
+  constructor(
+    private ordersService: OrdersService,
+    private ticketsService: TicketsService,
+  ) {}
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
@@ -35,5 +42,25 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   async startPayment(@Param('id') id: string) {
     return this.ordersService.startPayment(id);
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.ordersService.findPublicView(id);
+  }
+
+  @Get(':id/tickets')
+  async listTickets(@Param('id') id: string) {
+    await this.ordersService.assertExists(id);
+    return this.ticketsService.listForOrder(id);
+  }
+
+  @Patch(':id/tickets/:ticketId')
+  async nameTicket(
+    @Param('id') id: string,
+    @Param('ticketId') ticketId: string,
+    @Body() nameTicketDto: NameTicketDto,
+  ) {
+    return this.ticketsService.name(id, ticketId, nameTicketDto);
   }
 }

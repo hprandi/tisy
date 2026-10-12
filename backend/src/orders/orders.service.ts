@@ -32,6 +32,19 @@ interface ReservedOrderItem {
   quantity: number;
 }
 
+export interface OrderView {
+  id: string;
+  status: OrderStatus;
+  event: {
+    id: string;
+    title: string;
+    location: string;
+    startDate: Date;
+    endDate: Date;
+  };
+  buyerName: string;
+}
+
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: { orderItems: { include: { ticketTier: true } } };
 }>;
@@ -72,6 +85,45 @@ export class OrdersService {
         include: { orderItems: true },
       });
     });
+  }
+
+  async findPublicView(id: string): Promise<OrderView> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        event: {
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
+        buyer: { select: { name: true } },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found.');
+    }
+
+    return {
+      id: order.id,
+      status: order.status,
+      event: order.event,
+      buyerName: order.buyer.name,
+    };
+  }
+
+  async assertExists(id: string): Promise<void> {
+    const found = await this.prisma.order.count({ where: { id } });
+
+    if (found === 0) {
+      throw new NotFoundException('Order not found.');
+    }
   }
 
   async startPayment(orderId: string): Promise<{ checkoutUrl: string }> {
