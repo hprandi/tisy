@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { setupApiDocs } from './api-docs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -12,6 +13,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  setupApiDocs(app);
 
   await app.listen(process.env.PORT ?? 3000);
 }

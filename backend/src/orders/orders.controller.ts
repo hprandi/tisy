@@ -9,6 +9,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../auth/authenticated-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -17,6 +18,7 @@ import { OrdersService } from './orders.service';
 import { NameTicketDto } from '../tickets/name-ticket.dto';
 import { TicketsService } from '../tickets/tickets.service';
 
+@ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
   constructor(
@@ -26,6 +28,7 @@ export class OrdersController {
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() createOrderDto: CreateOrderDto,

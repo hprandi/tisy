@@ -1,4 +1,4 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/swagger';
 import { CreateTicketTierDto } from './create-ticket-tier.dto';
 
 export class UpdateTicketTierDto extends PartialType(

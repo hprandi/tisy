@@ -7,6 +7,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { PaymentStatusService } from './payment-status.service';
 import {
@@ -15,6 +16,7 @@ import {
   type WebhookNotification,
 } from './payment-provider.interface';
 
+@ApiTags('payments')
 @Controller('payments/webhook')
 export class PaymentsController {
   constructor(
@@ -43,8 +45,13 @@ export class PaymentsController {
       return { received: true };
     }
 
-    const { status, orderId } = await this.paymentProvider.getPaymentStatus(paymentId); // Re-fetches from the provider's API instead of trusting the webhook payload
-    await this.paymentConfirmationService.receivePaymentStatusUpdate(orderId, status, paymentId);
+    const { status, orderId } =
+      await this.paymentProvider.getPaymentStatus(paymentId); // Re-fetches from the provider's API instead of trusting the webhook payload
+    await this.paymentConfirmationService.receivePaymentStatusUpdate(
+      orderId,
+      status,
+      paymentId,
+    );
     return { received: true };
   }
 }

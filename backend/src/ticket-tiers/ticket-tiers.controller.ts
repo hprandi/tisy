@@ -9,6 +9,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../auth/authenticated-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,8 +18,10 @@ import { CreateTicketTierDto } from './create-ticket-tier.dto';
 import { TicketTiersService } from './ticket-tiers.service';
 import { UpdateTicketTierDto } from './update-ticket-tier.dto';
 
+@ApiTags('ticket-tiers')
 @Controller('events/:eventId/ticket-tiers')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class TicketTiersController {
   constructor(
     private ticketTiersService: TicketTiersService,
