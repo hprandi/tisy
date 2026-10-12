@@ -34,6 +34,7 @@ export interface SaleOverrides {
   eventStatus?: EventStatus;
   salesStartAt?: Date;
   salesEndAt?: Date;
+  organizerId?: string;
 }
 
 export async function seedEventOnSale(
@@ -47,14 +48,16 @@ export async function seedEventOnSale(
       startDate: new Date(Date.now() + 24 * HOUR_IN_MS),
       endDate: new Date(Date.now() + 48 * HOUR_IN_MS),
       status: overrides.eventStatus ?? EventStatus.PUBLISHED,
-      organizer: {
-        create: {
-          name: 'Seeded Organizer',
-          email: 'organizer@test.com',
-          documentType: DocumentType.CPF,
-          documentNumber: '12345678901',
-        },
-      },
+      organizer: overrides.organizerId
+        ? { connect: { id: overrides.organizerId } }
+        : {
+            create: {
+              name: 'Seeded Organizer',
+              email: 'organizer@test.com',
+              documentType: DocumentType.CPF,
+              documentNumber: '12345678901',
+            },
+          },
       ticketTiers: {
         create: {
           name: 'General',

@@ -107,7 +107,7 @@ OrderItem 1──N Ticket
 
 **Tickets are issued on payment and named afterwards** — when an `Order` goes `PENDING → PAID`, one `Ticket` per unit purchased is created in the same transaction, and only if that update affected a row, so a repeated payment notification creates nothing. The buyer then names each ticket with a conditional `UPDATE` (`WHERE id = ? AND orderId = ? AND status = 'issued'`), so a ticket is named once. Only `ready` tickets are valid for entry, and a `ready` ticket always has a `holderName`; renaming or reassigning a named ticket is a later evolution.
 
-**Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE status = 'ready'`, preventing two simultaneous reads from validating the same ticket twice and rejecting tickets that have no holder yet.
+**Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE code = ? AND status = 'ready' AND <ticket belongs to the event>`, preventing two simultaneous reads from validating the same ticket twice, rejecting tickets that have no holder yet, and rejecting a ticket scanned at another event. Only the event's organizer can check tickets in.
 
 **Frozen price per order** — `OrderItem.unitPrice` is always a copy of the price at the moment of purchase, never a reference to the current price of `TicketTier`.
 
@@ -126,4 +126,4 @@ OrderItem 1──N Ticket
 ## Implementation Notes (Do Not Block the Model, But Worth Remembering Later)
 
 - Uniqueness of `documentNumber` across different `User`s is not currently guaranteed (could allow the same document registered under different emails) — evaluate if it's worth adding validation/alert in the future.
-- A denormalized `eventId` field directly on `Ticket` might be worthwhile for check-in query performance (avoids join to `Order`/`Event` with each QR read) — decide at implementation time, not a structural change to the model.
+- `Ticket` has no denormalized `eventId`: check-in reaches the event through `OrderItem → Order`. The lookup is by the unique `code`, so the two joins are by primary key and cost nothing at MVP scale, while a copied `eventId` would be redundant data the database cannot keep consistent. Revisit only if measured check-in latency calls for it.

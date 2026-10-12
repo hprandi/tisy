@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PAYMENT_PROVIDER } from '../../src/payments/payment-provider.interface';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { AuthApi } from './api/auth-api';
+import { CheckInApi } from './api/check-in-api';
 import { EventsApi } from './api/events-api';
 import { OrdersApi } from './api/orders-api';
 import { PaymentWebhookApi } from './api/payment-webhook-api';
@@ -21,6 +22,7 @@ export interface AppContext {
   events: EventsApi;
   ticketTiers: TicketTiersApi;
   webhook: PaymentWebhookApi;
+  checkIn: CheckInApi;
 }
 
 // The payment provider is replaced by a fake.
@@ -61,6 +63,7 @@ function bootApp(context: AppContext, paymentProvider?: FakePaymentProvider) {
       events: new EventsApi(app),
       ticketTiers: new TicketTiersApi(app),
       webhook: new PaymentWebhookApi(app),
+      checkIn: new CheckInApi(app),
     });
   });
 

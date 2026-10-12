@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import {
   ConflictException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,6 +15,12 @@ export interface TicketView {
   tierName: string;
   holderName: string | null;
   status: TicketStatus;
+}
+
+export interface CheckInView {
+  holderName: string;
+  tierName: string;
+  checkedInAt: Date;
 }
 
 const TICKET_VIEW_INCLUDE = {
@@ -82,6 +89,48 @@ export class TicketsService {
     });
 
     return this.toView(ticket);
+  }
+
+  async checkIn(eventId: string, code: string): Promise<CheckInView> {
+    const checkedIn = await this.prisma.ticket.updateMany({
+      where: {
+        code,
+        status: TicketStatus.READY,
+        orderItem: { order: { eventId } },
+      },
+      data: { status: TicketStatus.CHECKED_IN, checkedInAt: new Date() },
+    });
+
+    if (checkedIn.count === 0) {
+      await this.rejectCheckIn(eventId, code);
+    }
+
+    const ticket = await this.prisma.ticket.findUniqueOrThrow({
+      where: { code },
+      include: TICKET_VIEW_INCLUDE,
+    });
+
+    return {
+      holderName: ticket.holderName!,
+      tierName: ticket.orderItem.ticketTier.name,
+      checkedInAt: ticket.checkedInAt!,
+    };
+  }
+
+  private async rejectCheckIn(eventId: string, code: string): Promise<never> {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { code, orderItem: { order: { eventId } } },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found.');
+    }
+    throw new ConflictException({
+      statusCode: HttpStatus.CONFLICT,
+      message: 'Ticket is not valid for entry.',
+      ticketStatus: ticket.status,
+      checkedInAt: ticket.checkedInAt,
+    });
   }
 
   private async rejectNaming(
