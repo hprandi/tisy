@@ -31,6 +31,7 @@ describe('Auth (integration)', () => {
     expect(afterRegistration.body).toMatchObject({
       email: person.email,
       name: person.name,
+      canOrganize: false,
     });
     expect(afterRegistration.body).not.toHaveProperty('passwordHash');
     expect(afterLogin.status).toBe(200);

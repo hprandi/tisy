@@ -2,6 +2,7 @@ import { EventStatus } from '@prisma/client';
 import type { ApiResult } from './helpers/api/api-result';
 import { aTicketTier, anEvent, hoursFromNow } from './helpers/builders';
 import {
+  aMember,
   anOrganizer,
   countEvents,
   countTicketTiers,
@@ -16,7 +17,7 @@ describe('Event publishing (integration)', () => {
 
   it('happy path: create an event, add a tier and publish it', async () => {
     // Given a registered organizer
-    const organizer = await anOrganizer(ctx.auth);
+    const organizer = await anOrganizer(ctx);
 
     // When they create an event, add a ticket tier and publish it
     const created = await ctx.events.create(organizer.token, anEvent());
@@ -40,7 +41,7 @@ describe('Event publishing (integration)', () => {
 
   it('a visitor cannot see draft events', async () => {
     // Given a draft event and a published event with a tier
-    const owner = await anOrganizer(ctx.auth);
+    const owner = await anOrganizer(ctx);
     const draftId = await seedEvent(ctx.prisma, owner.id);
     const publishedId = await seedEvent(
       ctx.prisma,
@@ -63,7 +64,7 @@ describe('Event publishing (integration)', () => {
 
   it('organizer edits an event', async () => {
     // Given an organizer with an event
-    const owner = await anOrganizer(ctx.auth);
+    const owner = await anOrganizer(ctx);
     const eventId = await seedEvent(ctx.prisma, owner.id);
 
     // When they edit its title and location
@@ -80,7 +81,7 @@ describe('Event publishing (integration)', () => {
   // Note: editing is rejected once the sales start has passed, even without touching dates (to be decided)
   it('organizer edits a ticket tier', async () => {
     // Given an organizer with an event and a tier
-    const owner = await anOrganizer(ctx.auth);
+    const owner = await anOrganizer(ctx);
     const eventId = await seedEvent(ctx.prisma, owner.id);
     const tierId = await seedTicketTier(ctx.prisma, eventId);
 
@@ -101,8 +102,8 @@ describe('Event publishing (integration)', () => {
 
   it('organizer lists their own events and tiers', async () => {
     // Given two organizers, each with an event, one of them with a tier
-    const first = await anOrganizer(ctx.auth);
-    const second = await anOrganizer(ctx.auth);
+    const first = await anOrganizer(ctx);
+    const second = await anOrganizer(ctx);
     const firstEventId = await seedEvent(ctx.prisma, first.id);
     const tierId = await seedTicketTier(ctx.prisma, firstEventId);
     await seedEvent(ctx.prisma, second.id);
@@ -118,7 +119,7 @@ describe('Event publishing (integration)', () => {
 
   it('publishing requires a ticket tier', async () => {
     // Given a draft event without tiers
-    const owner = await anOrganizer(ctx.auth);
+    const owner = await anOrganizer(ctx);
     const eventId = await seedEvent(ctx.prisma, owner.id);
 
     // When the organizer publishes it
@@ -133,7 +134,7 @@ describe('Event publishing (integration)', () => {
 
   it('only draft events can be published', async () => {
     // Given a published event
-    const owner = await anOrganizer(ctx.auth);
+    const owner = await anOrganizer(ctx);
     const eventId = await seedEvent(
       ctx.prisma,
       owner.id,
@@ -181,11 +182,11 @@ describe('Event publishing (integration)', () => {
       ],
     ])('cannot %s', async (_case, attempt) => {
       // Given organizer A's event with a tier
-      const owner = await anOrganizer(ctx.auth);
+      const owner = await anOrganizer(ctx);
       const eventId = await seedEvent(ctx.prisma, owner.id);
       const tierId = await seedTicketTier(ctx.prisma, eventId);
       const before = await ctx.events.get(eventId, owner.token);
-      const stranger = await anOrganizer(ctx.auth);
+      const stranger = await anOrganizer(ctx);
 
       // When organizer B tries it
       const result = await attempt({ token: stranger.token, eventId, tierId });
@@ -203,6 +204,18 @@ describe('Event publishing (integration)', () => {
 
     // Then 401
     expect(result.status).toBe(401);
+  });
+
+  it('members without the organizer capability cannot create events', async () => {
+    // Given a registered member who was never granted the capability
+    const member = await aMember(ctx.auth);
+
+    // When they create an event
+    const result = await ctx.events.create(member.token, anEvent());
+
+    // Then 403 and nothing is saved
+    expect(result.status).toBe(403);
+    expect(await countEvents(ctx.prisma)).toBe(0);
   });
 
   describe('invalid dates', () => {
@@ -254,7 +267,7 @@ describe('Event publishing (integration)', () => {
       ],
     ])('%s is rejected', async (_case, submit) => {
       // Given an organizer with a draft event
-      const organizer = await anOrganizer(ctx.auth);
+      const organizer = await anOrganizer(ctx);
       const eventId = await seedEvent(ctx.prisma, organizer.id);
 
       // When they submit it

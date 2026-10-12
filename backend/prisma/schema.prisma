@@ -50,6 +50,7 @@ model User {
   documentType   DocumentType
   documentNumber String
   passwordHash   String?
+  canOrganize    Boolean      @default(false)
   createdAt      DateTime     @default(now())
 
   organizedEvents Event[] @relation("EventOrganizer")

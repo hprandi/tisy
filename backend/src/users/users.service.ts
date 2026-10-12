@@ -79,6 +79,11 @@ export class UsersService {
     return user ? this.mapUserToPublicUser(user) : null;
   }
 
+  async canOrganize(userId: string): Promise<boolean> {
+    const user = await this.findUserById(userId);
+    return user?.canOrganize ?? false;
+  }
+
   async findOrCreateBuyer(
     name: string,
     email: string,

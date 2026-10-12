@@ -2,6 +2,7 @@ import { DocumentType, EventStatus } from '@prisma/client';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { AuthApi } from './api/auth-api';
 import { aPerson } from './builders';
+import type { AppContext } from './test-app';
 
 export const HOUR_IN_MS = 60 * 60 * 1000;
 
@@ -74,13 +75,27 @@ export async function seedEventOnSale(
   return { eventId: event.id, tierId: event.ticketTiers[0].id };
 }
 
-export interface Organizer {
+export interface Member {
   id: string;
   token: string;
 }
 
-// An account that can own events: registered through the API so it has a token.
-export async function anOrganizer(auth: AuthApi): Promise<Organizer> {
+export type Organizer = Member;
+
+// An account registered through the API so it has a token. The API cannot
+// grant the organizer capability, so it is set straight in the database.
+export async function anOrganizer(ctx: AppContext): Promise<Organizer> {
+  const { id, token } = await aMember(ctx.auth);
+  await ctx.prisma.user.update({
+    where: { id },
+    data: { canOrganize: true },
+  });
+
+  return { id, token };
+}
+
+// A registered account without the organizer capability.
+export async function aMember(auth: AuthApi): Promise<Member> {
   const registration = await auth.register(aPerson());
   const token = registration.body.accessToken;
   const me = await auth.me(token);

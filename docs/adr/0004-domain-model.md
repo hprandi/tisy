@@ -6,7 +6,7 @@ This document consolidates the domain model defined for the MVP of the ticket pl
 
 ### User
 
-Shared identity between organizers and buyers — there is no fixed role (`role`) on the account; the status of organizer is implicit by having created at least one `Event`.
+Shared identity between organizers and buyers — there is no fixed role (`role`) on the account. Organizing is a capability (`canOrganize`), not a role: the same person can organize and buy.
 
 | Field | Type | Required | Note |
 |---|---|---|---|
@@ -16,6 +16,7 @@ Shared identity between organizers and buyers — there is no fixed role (`role`
 | documentType | enum (CPF, PASSPORT, OTHER) | yes | `OTHER` covers unforeseen cases (e.g., RNE of foreign resident) |
 | documentNumber | string | yes | format/check-digit validation applies only when `documentType = CPF` |
 | passwordHash | string | no | null until the person "claims" the account by setting a password; passwordless accounts cannot authenticate via login |
+| canOrganize | boolean | yes | default `false`; see "Only granted users organize events" |
 | createdAt | datetime | yes | |
 
 ### Event
@@ -111,6 +112,8 @@ OrderItem 1──N Ticket
 **Frozen price per order** — `OrderItem.unitPrice` is always a copy of the price at the moment of purchase, never a reference to the current price of `TicketTier`.
 
 **Flexible document** — `documentType`/`documentNumber` accept CPF, passport, or other; format validation applies only to CPF.
+
+**Only granted users organize events** — creating an `Event` requires `User.canOrganize`, read from the database on each request (not from the JWT), so a change takes effect immediately. The capability is granted only by the developer, directly in the database; no API endpoint grants or revokes it. Sales go to the owner's Mercado Pago account, so open event creation would let a stranger sell tickets with the owner's money flow. Every other event and tier operation already requires owning the event, so it needs no extra check.
 
 **Passwordless accounts do not authenticate** — null `User.passwordHash` blocks login; the person must go through a "claim account" flow (to be defined) before being able to log in.
 

@@ -8,17 +8,25 @@ import {
 import { EventStatus, TicketTierStatus } from '@prisma/client';
 import type { Event } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { CreateEventDto } from './create-event.dto';
 import { UpdateEventDto } from './update-event.dto';
 
 @Injectable()
 export class EventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private usersService: UsersService,
+  ) {}
 
   async create(
     createEventDto: CreateEventDto,
     organizerId: string,
   ): Promise<Event> {
+    if (!(await this.usersService.canOrganize(organizerId))) {
+      throw new ForbiddenException('User is not allowed to organize events.');
+    }
+
     const startDate = new Date(createEventDto.startDate);
     const endDate = new Date(createEventDto.endDate);
 

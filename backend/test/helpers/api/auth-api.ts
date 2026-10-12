@@ -14,6 +14,7 @@ export interface Account {
   email: string;
   documentType: string;
   documentNumber: string;
+  canOrganize: boolean;
   createdAt: string;
 }
 

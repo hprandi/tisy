@@ -17,7 +17,7 @@ describe('Checkout (integration)', () => {
 
   // The happy path prepares the event through the organizer's real endpoints.
   async function createEventOnSaleThroughApi() {
-    const organizer = await anOrganizer(ctx.auth);
+    const organizer = await anOrganizer(ctx);
     const event = await ctx.events.create(organizer.token, anEvent());
     const eventId = event.body.id;
     const tier = await ctx.ticketTiers.create(
