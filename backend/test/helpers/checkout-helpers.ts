@@ -15,6 +15,9 @@ export function checkoutHelpers(ctx: AppContext) {
     findOrder: (orderId: string) =>
       ctx.prisma.order.findUniqueOrThrow({ where: { id: orderId } }),
 
+    ticketsOf: (orderId: string) =>
+      ctx.prisma.ticket.findMany({ where: { orderItem: { orderId } } }),
+
     stockOf: async (tierId: string): Promise<number> => {
       const tier = await ctx.prisma.ticketTier.findUniqueOrThrow({
         where: { id: tierId },

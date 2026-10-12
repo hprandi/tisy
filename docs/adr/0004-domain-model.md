@@ -77,9 +77,11 @@ Note: buyer data (name, email, document) is **not** duplicated here — it stays
 | Field | Type | Required | Note |
 |---|---|---|---|
 | id | uuid | yes | |
-| orderItemId | uuid (→ OrderItem.id) | yes | one `Ticket` per unit purchased |
-| code | string | yes | unique and non-guessable token (UUID or signed) — used in QR code |
-| status | enum (issued, checked_in, cancelled) | yes | |
+| orderItemId | uuid (→ OrderItem.id) | yes | one `Ticket` per unit purchased, created when the order is paid; the tier comes from the item |
+| code | string | yes | unique and non-guessable token (128 random bits, base64url, 22 characters) — what the QR code carries; separate from `id` so it can be replaced without changing the ticket |
+| holderName | string | no | the person who will enter; null until the ticket is named |
+| holderEmail | string | no | where to send the ticket to that person; optional even when named |
+| status | enum (issued, ready, checked_in, cancelled) | yes | `issued` = created on payment, no holder yet; `ready` = has a holder (`holderName` is set), valid for entry; `checked_in` = already used; `cancelled` |
 | checkedInAt | datetime | no | |
 
 ## Relationships
@@ -102,7 +104,9 @@ OrderItem 1──N Ticket
 
 **Reservation expiration** — every pending `Order` has `expiresAt`, but automatic release of stock held by expired pending orders is not yet implemented (see backlog in `ai/action_plan.md`) — until then, abandoned checkouts permanently reduce `quantityAvailable`.
 
-**Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE status = 'issued'`, preventing two simultaneous reads from validating the same ticket twice.
+**Tickets are issued on payment and named afterwards** — when an `Order` goes `PENDING → PAID`, one `Ticket` per unit purchased is created in the same transaction, and only if that update affected a row, so a repeated payment notification creates nothing. The buyer then names each ticket with a conditional `UPDATE` (`WHERE id = ? AND orderId = ? AND status = 'issued'`), so a ticket is named once. Only `ready` tickets are valid for entry, and a `ready` ticket always has a `holderName`; renaming or reassigning a named ticket is a later evolution.
+
+**Atomic check-in** — reading the QR code updates the `Ticket` with `UPDATE ... WHERE status = 'ready'`, preventing two simultaneous reads from validating the same ticket twice and rejecting tickets that have no holder yet.
 
 **Frozen price per order** — `OrderItem.unitPrice` is always a copy of the price at the moment of purchase, never a reference to the current price of `TicketTier`.
 

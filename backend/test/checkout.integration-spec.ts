@@ -1,7 +1,7 @@
 import { EventStatus, OrderStatus } from '@prisma/client';
-import type { PaymentConfirmationStatus } from '../src/payments/payment-provider.interface';
 import { aTicketTier, anEvent } from './helpers/builders';
 import { checkoutHelpers } from './helpers/checkout-helpers';
+import { paymentHelpers } from './helpers/payment-helpers';
 import {
   HOUR_IN_MS,
   anOrganizer,
@@ -13,6 +13,7 @@ import { useTestApp } from './helpers/test-app';
 describe('Checkout (integration)', () => {
   const ctx = useTestApp();
   const { placeOrder, findOrder, stockOf } = checkoutHelpers(ctx);
+  const { reportPayment } = paymentHelpers(ctx);
 
   // The happy path prepares the event through the organizer's real endpoints.
   async function createEventOnSaleThroughApi() {
@@ -35,13 +36,6 @@ describe('Checkout (integration)', () => {
     await ctx.events.publish(organizer.token, eventId);
 
     return { eventId, tierId };
-  }
-
-  function reportPayment(orderId: string, status: PaymentConfirmationStatus) {
-    ctx.paymentProvider.nextOrderId = orderId;
-    ctx.paymentProvider.nextStatus = status;
-
-    return ctx.webhook.notify();
   }
 
   it('happy path: a guest buyer orders, pays and the order becomes PAID', async () => {
@@ -77,83 +71,6 @@ describe('Checkout (integration)', () => {
       Date.now(),
     );
     expect(await stockOf(tierId)).toBe(8);
-  });
-
-  it('an approved payment marks the order PAID', async () => {
-    // Given a pending order of 2 tickets whose payment was started
-    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
-    const order = await placeOrder(eventId, tierId, 2);
-    await ctx.orders.startPayment(order.body.id);
-
-    // When the payment provider reports the payment approved
-    await reportPayment(order.body.id, 'approved');
-
-    // Then the order is PAID, paidAt is set, paymentExternalId is the payment id
-    //   (not the checkout session id) and the stock is still 8
-    const paid = await findOrder(order.body.id);
-    expect(paid.status).toBe(OrderStatus.PAID);
-    expect(paid.paidAt).not.toBeNull();
-    expect(paid.paymentExternalId).toBe('fake-payment-id');
-    expect(await stockOf(tierId)).toBe(8);
-  });
-
-  it('a cancelled payment cancels the order and releases the stock', async () => {
-    // Given a pending order of 2 tickets (stock 8)
-    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
-    const order = await placeOrder(eventId, tierId, 2);
-    expect(await stockOf(tierId)).toBe(8);
-
-    // When the payment provider reports the payment cancelled
-    await reportPayment(order.body.id, 'cancelled');
-
-    // Then the order is CANCELLED and the stock is back to 10
-    expect((await findOrder(order.body.id)).status).toBe(OrderStatus.CANCELLED);
-    expect(await stockOf(tierId)).toBe(10);
-  });
-
-  it('a pending payment waits and a later approval marks the order PAID', async () => {
-    // Given a pending order
-    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
-    const order = await placeOrder(eventId, tierId, 2);
-
-    // When the payment provider first reports the payment pending, then approved
-    await reportPayment(order.body.id, 'pending');
-    const afterPending = await findOrder(order.body.id);
-    await reportPayment(order.body.id, 'approved');
-    const afterApproved = await findOrder(order.body.id);
-
-    // Then the order stays PENDING after the first notification and becomes PAID after the second
-    expect(afterPending.status).toBe(OrderStatus.PENDING);
-    expect(afterApproved.status).toBe(OrderStatus.PAID);
-  });
-
-  it('a cancelled notification repeated twice releases the stock once', async () => {
-    // Given a pending order of 2 tickets (stock 8)
-    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
-    const order = await placeOrder(eventId, tierId, 2);
-
-    // When the same cancelled notification arrives twice
-    await reportPayment(order.body.id, 'cancelled');
-    await reportPayment(order.body.id, 'cancelled');
-
-    // Then the stock is 10, not 12
-    expect(await stockOf(tierId)).toBe(10);
-  });
-
-  it('an approved notification repeated twice does not change paidAt', async () => {
-    // Given a pending order
-    const { eventId, tierId } = await seedEventOnSale(ctx.prisma);
-    const order = await placeOrder(eventId, tierId, 2);
-
-    // When the same approved notification arrives twice
-    await reportPayment(order.body.id, 'approved');
-    const firstPaidAt = (await findOrder(order.body.id)).paidAt;
-    await reportPayment(order.body.id, 'approved');
-
-    // Then the order is PAID and paidAt does not change on the second one
-    const afterSecond = await findOrder(order.body.id);
-    expect(afterSecond.status).toBe(OrderStatus.PAID);
-    expect(afterSecond.paidAt).toEqual(firstPaidAt);
   });
 
   it('two buyers racing for the last ticket cannot oversell it', async () => {
